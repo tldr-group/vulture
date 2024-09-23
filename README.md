@@ -1,5 +1,32 @@
 # threetures
 
+## Model:
+
+1) learned conv downsampler that takes image and iteratively downsamples, increasing channel depth. 
+    - (H, W, 3)
+    - (H / 2, W / 2, 8)
+    - (H / 4, W / 4, 8)
+    - (H / 8, W / 8, 16)
+    - (H / 16, W / 16, 16)
+    - Resize to (H / 14, W / 14, 16)
+2) learned conv upsampler that goes from lr features -> hr features with image guidance from each stage of the downsampler:
+    - (H / 14, W / 14, 128) + (H / 14, W / 14, 16)
+    - (H / 8, W/ 8, 128) + (H / 8, W / 8, 16)
+    - (H / 4, W/ 4, 128) + (H / 4, W / 4, 8)
+    - (H / 2, W/ 2, 128) + (H / 2, W / 2, 8)
+    - (H, W, 128) + (H, W, 8)
+
+
+## Dataset:
+
+Featup implict can generate high-res features, but increasing resolution above (224, 224) is slow - may as well use a (224, 224) image dataset. [ImageNet reduced](https://huggingface.co/datasets/richwardle/reduced-imagenet) consists of 26,000 (224, 224) images of 26 examples of the 1,000 classes in ImageNet. I've taken 2 from each class for a total of 2,000 images, saved in 10 different splits in [`splits/`](data/imagenet_reduced/splits/).
+
+By default FeatUp compresses to 128 channels - we'll keep that as it a) speeds things up and b) reduces storage space taken up by features. We just use their default config, except changing the input dir and adding the option in [`featup/train_implict_upsampler.py`](FeatUp/featup/train_implicit_upsampler.py). NB: if we want to generate embeddings for higher image size (square) data (i.e, > 224^2), need to adjust `final_size` to be larger.
+
+
+
+
+
 
 ## Datasets:
 
