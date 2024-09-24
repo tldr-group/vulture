@@ -145,6 +145,7 @@ class Upsampler(nn.Module):
 
         self.patch_size = patch_size
         self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
+        self.outp_conv = torch.nn.Conv2d(n_ch_in, n_ch_in, 3)
 
         upsamples: list[nn.Module] = []
         n_upsamples = ceil(log2(patch_size))
@@ -161,7 +162,7 @@ class Upsampler(nn.Module):
         _, _, double_h, double_w = downsamples[1].shape
         _, _, out_h, out_w = downsamples[-1].shape
 
-        x = self.inp_conv(x)
+        x = self.inp_conv(x)  # mix info before Conv2DT
         i = 0
         for layer, guidance in zip(self.upsamples, downsamples):
             if i == 1:
@@ -169,6 +170,7 @@ class Upsampler(nn.Module):
             x_in = torch.cat((x, guidance), dim=1)
             x = layer(x_in)
             i += 1
+        x = self.outp_conv(x)  # conv w/out LReLu activation
         x = F.interpolate(x, (out_h, out_w))
         return x
 

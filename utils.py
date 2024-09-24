@@ -43,17 +43,30 @@ def to_numpy(tensor: torch.Tensor) -> np.ndarray:
 
 
 def get_arrs_from_batch(
-    img: torch.Tensor, lr_feats: torch.Tensor, hr_feats: torch.Tensor
+    img: torch.Tensor,
+    lr_feats: torch.Tensor,
+    hr_feats: torch.Tensor,
+    pred_hr_feats: torch.Tensor | None,
 ) -> list[list[np.ndarray]]:
     b, c, h, w = hr_feats.shape
 
     arrs: list[list[np.ndarray]] = []
     for i in range(b):
-        img_tensor, lr_feat_tensor, hr_feat_tensor = img[i], lr_feats[i], hr_feats[i]
+        img_tensor, lr_feat_tensor, hr_feat_tensor, pred_hr_tensor = (
+            img[i],
+            lr_feats[i],
+            hr_feats[i],
+            pred_hr_feats[i],
+        )
         img_arr = to_numpy(img_tensor.permute((1, 2, 0)))
 
         out_2D_arrs: list[np.ndarray] = [img_arr]
-        for i, d in enumerate((lr_feat_tensor, hr_feat_tensor)):
+        tensors = (
+            (lr_feat_tensor, hr_feat_tensor, pred_hr_tensor)
+            if isinstance(pred_hr_feats, torch.Tensor)
+            else (lr_feat_tensor, hr_feat_tensor)
+        )
+        for i, d in enumerate(tensors):
             feat_arr = to_numpy(d)
             k = 3
             pca = PCA(n_components=k)
@@ -74,11 +87,13 @@ def visualise(
     img: torch.Tensor | Image.Image,
     lr_feats: torch.Tensor,
     hr_feats: torch.Tensor,
+    pred_hr_feats: torch.Tensor | None,
     out_path: str,
 ) -> None:
     # b, c, h, w = hr_feats.shape
-    arrs = get_arrs_from_batch(img, lr_feats, hr_feats)
-    fig, axs = plt.subplots(nrows=3, ncols=len(arrs))
+    n_rows = 4 if isinstance(pred_hr_feats, torch.Tensor) else 3
+    arrs = get_arrs_from_batch(img, lr_feats, hr_feats, pred_hr_feats)
+    fig, axs = plt.subplots(nrows=n_rows, ncols=len(arrs))
     fig.set_size_inches(24, 12)
     for i, arr in enumerate(arrs):
         for j, sub_arr in enumerate(arr):
@@ -91,3 +106,9 @@ def visualise(
     plt.tight_layout()
     plt.savefig(out_path)
     plt.close()
+
+
+def plot_losses(train_loss: list[float], val_loss: list[float], out_path: str) -> None:
+    epochs = np.arange(len(train_loss))
+    plt.plot(epochs, train_loss, lw=2, label="train")
+    plt.plot(epochs, val_loss, lw=2, label="val")
