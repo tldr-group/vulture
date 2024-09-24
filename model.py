@@ -17,16 +17,32 @@ class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2. Adapted to use leaky ReLu"""
 
     def __init__(
-        self, in_channels: int, out_channels: int, mid_channels: int | None = None
+        self,
+        in_channels: int,
+        out_channels: int,
+        mid_channels: int | None = None,
+        k: int = 3,
     ):
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(
+                in_channels,
+                mid_channels,
+                kernel_size=k,
+                padding=floor(k / 2),
+                bias=False,
+            ),
             nn.BatchNorm2d(mid_channels),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(
+                mid_channels,
+                out_channels,
+                kernel_size=k,
+                padding=floor(k / 2),
+                bias=False,
+            ),
             nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(inplace=True),
         )
@@ -38,10 +54,10 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels: int, out_channels: int, k: int = 3):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2), DoubleConv(in_channels, out_channels)
+            nn.MaxPool2d(2), DoubleConv(in_channels, out_channels, k=k)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -55,6 +71,7 @@ class Up(nn.Module):
         self,
         in_channels: int = 128,
         out_channels: int = 128,
+        k: int = 3,
         learned: bool = True,
     ):
         super().__init__()
@@ -64,10 +81,10 @@ class Up(nn.Module):
             self.up = nn.ConvTranspose2d(
                 in_channels, in_channels, kernel_size=2, stride=2
             )
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, k=k)
         else:
             self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, k=k)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.up(x)
@@ -80,6 +97,7 @@ class Downsampler(nn.Module):
         patch_size: int,
         n_ch_in: int = 3,
         n_ch_out: int = 16,
+        k: int | list[int] = 3,
         learned: bool = True,
     ):
         super().__init__()
@@ -94,7 +112,8 @@ class Downsampler(nn.Module):
             out_ch = n_ch_out
             downsample: Down | nn.MaxPool2d
             if learned:
-                downsample = Down(prev_ch, out_ch)
+                current_k = k if isinstance(k, int) else k[i]
+                downsample = Down(prev_ch, out_ch, current_k)
             else:
                 downsample = nn.MaxPool2d(2)
             layers.append(downsample)
@@ -119,6 +138,7 @@ class Upsampler(nn.Module):
         patch_size: int,
         n_ch_in: int = 128,
         n_ch_downsample: int = 16,
+        k: int | list[int] = 3,
         learned: bool = True,
     ):
         super().__init__()
@@ -128,7 +148,8 @@ class Upsampler(nn.Module):
         upsamples: list[nn.Module] = []
         n_upsamples = ceil(log2(patch_size))
         for i in range(n_upsamples):
-            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, learned)
+            current_k = k if isinstance(k, int) else k[i]
+            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k, learned)
             upsamples.append(upsample)
         self.upsamples = nn.ModuleList(upsamples)
 
@@ -157,12 +178,16 @@ class Combined(nn.Module):
         n_ch_img: int = 3,
         n_ch_in: int = 128,
         n_ch_downsample: int = 16,
+        k_down: int | list[int] = 3,
+        k_up: int | list[int] = 3,
         learned: bool = True,
     ):
         super().__init__()
 
-        self.downsampler = Downsampler(patch_size, n_ch_img, n_ch_downsample, learned)
-        self.upsampler = Upsampler(patch_size, n_ch_in, n_ch_downsample, learned)
+        self.downsampler = Downsampler(
+            patch_size, n_ch_img, n_ch_downsample, k_down, learned
+        )
+        self.upsampler = Upsampler(patch_size, n_ch_in, n_ch_downsample, k_up, learned)
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
         downsamples: list[torch.Tensor] = self.downsampler(img)[::-1]
@@ -198,11 +223,14 @@ def test_benchmark():
 
 
 if __name__ == "__main__":
-    combined = Combined(14).to("cuda:1")
+    combined = Combined(14).to("cuda:1").eval()
 
-    l = 224
-    test = torch.ones((20, 3, l, l), device="cuda:1")
-    test_lr = torch.ones((20, 128, l // 14, l // 14), device="cuda:1")
+    l = 1400
+    test = torch.ones((1, 3, l, l), device="cuda:1")
+    test_lr = torch.ones((1, 128, l // 14, l // 14), device="cuda:1")
+
+    out: torch.Tensor = combined(test, test_lr)
+    print(out.shape)
 
     mem, time = measure_mem_time(test, test_lr, combined)
 
