@@ -1,5 +1,11 @@
 import torch
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
 from time import time_ns
+from PIL import Image
+import matplotlib.pyplot as plt
 
 
 def measure_mem_time(
@@ -27,3 +33,61 @@ def measure_mem_time(
     end_t = time_ns()
 
     return _to_MB(end_m - start_m), _to_s(end_t - start_t)
+
+
+def to_numpy(tensor: torch.Tensor) -> np.ndarray:
+    arr = tensor.detach().cpu().numpy()
+    if len(arr.shape) == 4:
+        arr = arr[0]
+    return arr
+
+
+def get_arrs_from_batch(
+    img: torch.Tensor, lr_feats: torch.Tensor, hr_feats: torch.Tensor
+) -> list[list[np.ndarray]]:
+    b, c, h, w = hr_feats.shape
+
+    arrs: list[list[np.ndarray]] = []
+    for i in range(b):
+        img_tensor, lr_feat_tensor, hr_feat_tensor = img[i], lr_feats[i], hr_feats[i]
+        img_arr = to_numpy(img_tensor.permute((1, 2, 0)))
+
+        out_2D_arrs: list[np.ndarray] = [img_arr]
+        for i, d in enumerate((lr_feat_tensor, hr_feat_tensor)):
+            feat_arr = to_numpy(d)
+            k = 3
+            pca = PCA(n_components=k)
+
+            n_c, h, w = feat_arr.shape
+            data_flat = feat_arr.reshape((n_c, h * w)).T
+            out = pca.fit_transform(data_flat)
+            out_rescaled = MinMaxScaler().fit_transform(out)
+
+            out_2D = out_rescaled.reshape((h, w, k))
+            out_2D_arrs.append(out_2D)
+        arrs.append(out_2D_arrs)
+    return arrs
+
+
+# put vis code in here
+def visualise(
+    img: torch.Tensor | Image.Image,
+    lr_feats: torch.Tensor,
+    hr_feats: torch.Tensor,
+    out_path: str,
+) -> None:
+    # b, c, h, w = hr_feats.shape
+    arrs = get_arrs_from_batch(img, lr_feats, hr_feats)
+    fig, axs = plt.subplots(nrows=3, ncols=len(arrs))
+    fig.set_size_inches(24, 12)
+    for i, arr in enumerate(arrs):
+        for j, sub_arr in enumerate(arr):
+            if len(arrs) == 1:
+                axs[j].imshow(sub_arr)
+                axs[j].set_axis_off()
+            else:
+                axs[j, i].imshow(sub_arr)
+                axs[j, i].set_axis_off()
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()

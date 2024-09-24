@@ -144,6 +144,7 @@ class Upsampler(nn.Module):
         super().__init__()
 
         self.patch_size = patch_size
+        self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
 
         upsamples: list[nn.Module] = []
         n_upsamples = ceil(log2(patch_size))
@@ -160,6 +161,7 @@ class Upsampler(nn.Module):
         _, _, double_h, double_w = downsamples[1].shape
         _, _, out_h, out_w = downsamples[-1].shape
 
+        x = self.inp_conv(x)
         i = 0
         for layer, guidance in zip(self.upsamples, downsamples):
             if i == 1:
@@ -192,6 +194,10 @@ class Combined(nn.Module):
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
         downsamples: list[torch.Tensor] = self.downsampler(img)[::-1]
         return self.upsampler(lr_feats, downsamples)
+
+
+# TODO:
+# - convs before conv2DT
 
 
 def test_benchmark():
