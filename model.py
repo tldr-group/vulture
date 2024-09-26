@@ -197,7 +197,7 @@ class Skips(nn.Module):
 
         self.lr_weight = lr_weight
         self.implict = ImplicitFeaturizer(True, n_freq_impl, True)
-        n_ch_downsample = 3  # + n_freq_impl * 10
+        n_ch_downsample = 3 + n_freq_impl * 10
 
         upsamples: list[nn.Module] = []
         self.n_upsamples = ceil(log2(patch_size))
@@ -225,18 +225,19 @@ class Skips(nn.Module):
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor):
         _, _, H, W = img.shape
-        # impl = self.implict(img)
+        impl = self.implict(img)
 
         sizes = self._get_sizes(H, W, self.n_upsamples)[::-1]
         x_prev = F.interpolate(lr_feats, sizes[0])
         for s, size in enumerate(sizes):
             x_prev = F.interpolate(x_prev, size)
-            guidance = F.interpolate(img, size)
-            # resized_lr_feats = F.interpolate(lr_feats, size)
+            guidance = F.interpolate(impl, size)
+            resized_lr_feats = F.interpolate(lr_feats, size)
 
-            # lr_weight = self.lr_weight / (s + 1)
+            lr_weight = self.lr_weight / (s + 1)
 
-            # x_prev = ((1 - lr_weight) * x_prev) + (lr_weight * resized_lr_feats)
+            x_prev = ((1 - lr_weight) * x_prev) * (lr_weight * resized_lr_feats)
+            # x_prev = x_prev * resized_lr_feats
             x_cat = torch.cat((x_prev, guidance), dim=1)
 
             if s < len(sizes) - 1:

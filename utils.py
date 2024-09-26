@@ -113,5 +113,6 @@ def plot_losses(train_loss: list[float], val_loss: list[float], out_path: str) -
     plt.semilogy(epochs, train_loss, lw=2, label="train")
     plt.semilogy(epochs, val_loss, lw=2, label="val")
     plt.legend()
+    plt.tight_layout()
     plt.savefig(out_path)
     plt.close()

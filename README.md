@@ -1,5 +1,32 @@
 # threetures
 
+## Notes 26/09/24;
+- most models bottom out around 15-17k loss (L2 or smooth L1)
+- can get high res but poor semantics or better semantics and blurring
+- simple strategy of resize lr feats -> img size then pass through many convs w/ implict feats not working
+- could try adding guidance from lr feats at each upsample (multiply by resized lr feats) to retain semantics?
+    - theory is this stops the network needing to learn it
+- could try larger kernels (11, 21 etc)
+    - theory is that semantics not being properly transmitted due to small receptive field
+- could try simple strategy:
+    - cat (lr feats from prev layer * resized lr feats, impl feats of resized img) -> 128 dims 
+    - i.e no learned downsampling
+    - reintroduces semantic info
+- what network size would help?
+    - would a small network force it to learn general features?
+    - would a large network actually be able to learn the correct output?
+- should you normalize output as well?
+- above simple strategy seems to be working well but:
+    - get nasty patching artefacts
+        - could try having more convs after upsampling (w/out lr feat guidance)
+        - could try weighting the features less as res intreaces
+        - could try doing (weighted) mean of feats not the product
+        - could try weihted sum of feats
+
+
+- fundamentally 
+
+
 ## Model:
 
 1) learned conv downsampler that takes image and iteratively downsamples, increasing channel depth. 

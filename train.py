@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from dataset import EmbeddingDataset, DataLoader, unnorm
-from model import Combined, Simple
+from model import Combined, Simple, Skips
 from utils import visualise, plot_losses
 
 torch.cuda.empty_cache()
@@ -12,16 +12,16 @@ DEVICE = "cuda:1"
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", device=DEVICE)
 val_ds = EmbeddingDataset("data/imagenet_reduced", "val", device=DEVICE)
 
-train_dl = DataLoader(train_ds, 60, True)
+train_dl = DataLoader(train_ds, 40, True)
 val_dl = DataLoader(
     val_ds,
     20,
     True,
 )
 
-net = Combined(14).to(DEVICE)  # Combined(14).to(DEVICE)
+net = Skips(14, k_up=5).to(DEVICE)  # Combined(14).to(DEVICE)
 
-opt = torch.optim.AdamW(net.parameters(), lr=1e-4)
+opt = torch.optim.AdamW(net.parameters(), lr=1e-3)
 N_EPOCHS = 5000
 SAVE_PER = 10
 
@@ -52,6 +52,12 @@ def feed_batch_get_loss(
     if training:
         loss.backward()
         opt.step()
+
+    img, lr_feats, hr_feats = (
+        img.to("cpu"),
+        lr_feats.to("cpu"),
+        hr_feats.to("cpu"),
+    )
 
     return loss.item()
 
