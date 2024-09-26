@@ -15,9 +15,12 @@ warnings.filterwarnings("ignore")
 
 # transforms: flips (ud, lr, ud-lr), rotations (90, 180, 270)
 
-
-FLIP_H_PROB, FLIP_V_PROB = 0.3, 0.3
+FLIP_H_PROB, FLIP_V_PROB = 0.5, 0.5
 ANGLES_DEG = [0, 0, 0, 0, 90, 180, 270]
+
+
+def unnorm(x: torch.Tensor) -> torch.Tensor:
+    return TF.normalize(x, [-0.485, -0.456, -0.406], [1 / 0.229, 1 / 0.224, 1 / 0.225])
 
 
 class EmbeddingDataset(Dataset):
@@ -59,15 +62,25 @@ class EmbeddingDataset(Dataset):
         flip_h: bool = torch.rand(1) > FLIP_H_PROB  # type: ignore
         flip_v: bool = torch.rand(1) > FLIP_V_PROB  # type: ignore
         rotate_deg = ANGLES_DEG[torch.randint(len(ANGLES_DEG), (1,))]
-        for tensor in (img_tensor, lr_feats, hr_feats):
-            if flip_h:
-                tensor = TF.hflip(tensor)
-            if flip_v:
-                tensor = TF.vflip(tensor)
-            tensor = TF.rotate(tensor, rotate_deg)
+        if flip_h:
+            img_tensor = TF.hflip(img_tensor)
+            lr_feats = TF.hflip(lr_feats)
+            hr_feats = TF.hflip(hr_feats)
+        if flip_v:
+            img_tensor = TF.vflip(img_tensor)
+            lr_feats = TF.vflip(lr_feats)
+            hr_feats = TF.vflip(hr_feats)
+        img_tensor = TF.rotate(img_tensor, rotate_deg)
+        lr_feats = TF.rotate(lr_feats, rotate_deg)
+        hr_feats = TF.rotate(hr_feats, rotate_deg)
+
         if self.norm:
-            lr_feats = F.normalize(lr_feats, 0)
-            hr_feats = F.normalize(hr_feats, 0)
+            img_tensor = img_tensor.to(torch.float32)
+            img_tensor = TF.normalize(
+                img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+            )
+            lr_feats = F.normalize(lr_feats, p=1, dim=0)
+            hr_feats = F.normalize(hr_feats, p=1, dim=0)
         return img_tensor, lr_feats, hr_feats
 
     def __getitem__(
@@ -96,7 +109,7 @@ class EmbeddingDataset(Dataset):
 
 if __name__ == "__main__":
     ds = EmbeddingDataset("data/imagenet_reduced", "train")
-    dl = DataLoader(ds, 10, True)
+    dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)
-    visualise(img, lr, hr, "batch_vis.png")
+    visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "batch_vis.png")
