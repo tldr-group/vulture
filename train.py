@@ -1,27 +1,31 @@
 import torch
 import torch.nn as nn
 
-from dataset import EmbeddingDataset, DataLoader
-from model import Combined
+from dataset import EmbeddingDataset, DataLoader, unnorm
+from model import Combined, Simple
 from utils import visualise, plot_losses
 
-# torch.cuda.empty_cache()
+torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", device=DEVICE)
 val_ds = EmbeddingDataset("data/imagenet_reduced", "val", device=DEVICE)
 
-train_dl = DataLoader(train_ds, 50, True)
-val_dl = DataLoader(val_ds, 20, True)
+train_dl = DataLoader(train_ds, 60, True)
+val_dl = DataLoader(
+    val_ds,
+    20,
+    True,
+)
 
-net = Combined(14).to(DEVICE)
+net = Combined(14).to(DEVICE)  # Combined(14).to(DEVICE)
 
 opt = torch.optim.AdamW(net.parameters(), lr=1e-4)
-N_EPOCHS = 20000
-SAVE_PER = 100
+N_EPOCHS = 5000
+SAVE_PER = 10
 
-loss_fn = torch.nn.MSELoss(reduction="sum")
+loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
 
 
 def feed_batch_get_loss(
@@ -48,11 +52,12 @@ def feed_batch_get_loss(
     if training:
         loss.backward()
         opt.step()
+
     return loss.item()
 
 
 train_losses, val_losses = [], []
-best_val_loss = 1000
+best_val_loss = 1e10
 for i in range(N_EPOCHS):
     epoch_loss = 0.0
     for batch in train_dl:
@@ -73,10 +78,12 @@ for i in range(N_EPOCHS):
         )
 
         pred_hr_feats = net(img, lr_feats)
-
+        img = unnorm(img)
         img = img.to(torch.uint8)
-        visualise(img, lr_feats, hr_feats, pred_hr_feats, f"experiments/val_{i}.png")
-        plot_losses(train_losses, val_losses, f"experiments/losses.png")
+        visualise(
+            img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png"
+        )
+        plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
 
         if val_loss < best_val_loss:
-            torch.save(net, f"experiments/best.pth")
+            torch.save(net, f"experiments/current/best.pth")
