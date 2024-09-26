@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
 from torchvision.transforms import functional as TF
 from os import listdir
 from PIL import Image
@@ -27,6 +28,7 @@ class EmbeddingDataset(Dataset):
         which: Literal["train", "val"],
         using_splits: bool = True,
         device: str = "cuda:0",
+        norm: bool = True,
     ) -> None:
         super().__init__()
 
@@ -44,6 +46,7 @@ class EmbeddingDataset(Dataset):
         self.img_dir = (
             f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         )
+        self.norm = norm
 
     def __len__(self):
         return self.n
@@ -62,6 +65,9 @@ class EmbeddingDataset(Dataset):
             if flip_v:
                 tensor = TF.vflip(tensor)
             tensor = TF.rotate(tensor, rotate_deg)
+        if self.norm:
+            lr_feats = F.normalize(lr_feats, 0)
+            hr_feats = F.normalize(hr_feats, 0)
         return img_tensor, lr_feats, hr_feats
 
     def __getitem__(

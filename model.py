@@ -145,7 +145,8 @@ class Upsampler(nn.Module):
 
         self.patch_size = patch_size
         self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
-        self.outp_conv = torch.nn.Conv2d(n_ch_in, n_ch_in, 3)
+        self.outp_conv = nn.Conv2d(n_ch_in, n_ch_in, 3, padding=1)
+        self.act = nn.Tanh()
 
         upsamples: list[nn.Module] = []
         n_upsamples = ceil(log2(patch_size))
@@ -171,6 +172,7 @@ class Upsampler(nn.Module):
             x = layer(x_in)
             i += 1
         x = self.outp_conv(x)  # conv w/out LReLu activation
+        x = self.act(x)
         x = F.interpolate(x, (out_h, out_w))
         return x
 
@@ -231,11 +233,11 @@ def test_benchmark():
 
 
 if __name__ == "__main__":
-    combined = Combined(14).to("cuda:1").eval()
+    combined = Combined(14).to("cuda:0").eval()
 
     l = 1400
-    test = torch.ones((1, 3, l, l), device="cuda:1")
-    test_lr = torch.ones((1, 128, l // 14, l // 14), device="cuda:1")
+    test = torch.ones((1, 3, l, l), device="cuda:0")
+    test_lr = torch.ones((1, 128, l // 14, l // 14), device="cuda:0")
 
     out: torch.Tensor = combined(test, test_lr)
     print(out.shape)

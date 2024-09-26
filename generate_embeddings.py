@@ -31,5 +31,5 @@ parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
     # so far have done 0 and 2
-    # need to do 1, 3, 4, 5, 6, 7, 8, 9
+    # need to do 3, 4, 5, 6, 7, 8, 9
     start_featup(args.n)

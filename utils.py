@@ -110,5 +110,8 @@ def visualise(
 
 def plot_losses(train_loss: list[float], val_loss: list[float], out_path: str) -> None:
     epochs = np.arange(len(train_loss))
-    plt.plot(epochs, train_loss, lw=2, label="train")
-    plt.plot(epochs, val_loss, lw=2, label="val")
+    plt.semilogy(epochs, train_loss, lw=2, label="train")
+    plt.semilogy(epochs, val_loss, lw=2, label="val")
+    plt.legend()
+    plt.savefig(out_path)
+    plt.close()
