@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from layers import ImplicitFeaturizer, DoubleConv, Up, Down
+
 import torch.utils.benchmark as benchmark
 from utils import measure_mem_time
 
@@ -9,158 +11,6 @@ torch.backends.cudnn.benchmark = False
 
 import numpy as np
 from math import log2, floor, ceil
-
-
-# from featup
-class ImplicitFeaturizer(torch.nn.Module):
-
-    def __init__(
-        self,
-        color_feats: bool = True,
-        n_freqs: int = 10,
-        learn_bias: bool = False,
-        time_feats: bool = False,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.color_feats = color_feats
-        self.time_feats = time_feats
-        self.n_freqs = n_freqs
-        self.learn_bias = learn_bias
-
-        self.dim_multiplier = 2
-
-        if self.color_feats:
-            self.dim_multiplier += 3
-
-        if self.time_feats:
-            self.dim_multiplier += 1
-
-        if self.learn_bias:
-            self.biases = torch.nn.Parameter(
-                torch.randn(2, self.dim_multiplier, n_freqs).to(torch.float32)
-            )
-
-    def forward(self, original_image: torch.Tensor) -> torch.Tensor:
-        b, c, h, w = original_image.shape
-        grid_h = torch.linspace(-1, 1, h, device=original_image.device)
-        grid_w = torch.linspace(-1, 1, w, device=original_image.device)
-        feats = torch.cat(
-            [t.unsqueeze(0) for t in torch.meshgrid([grid_h, grid_w])]
-        ).unsqueeze(0)
-        feats = torch.broadcast_to(feats, (b, feats.shape[1], h, w))
-
-        if self.color_feats:
-            feat_list = [feats, original_image]
-        else:
-            feat_list = [feats]
-
-        feats = torch.cat(feat_list, dim=1).unsqueeze(1)
-        freqs = torch.exp(
-            torch.linspace(-2, 10, self.n_freqs, device=original_image.device)
-        ).reshape(1, self.n_freqs, 1, 1, 1)
-        feats = feats * freqs
-
-        if self.learn_bias:
-            sin_feats = feats + self.biases[0].reshape(
-                1, self.n_freqs, self.dim_multiplier, 1, 1
-            )
-            cos_feats = feats + self.biases[1].reshape(
-                1, self.n_freqs, self.dim_multiplier, 1, 1
-            )
-        else:
-            sin_feats = feats
-            cos_feats = feats
-
-        sin_feats = sin_feats.reshape(b, self.n_freqs * self.dim_multiplier, h, w)
-        cos_feats = cos_feats.reshape(b, self.n_freqs * self.dim_multiplier, h, w)
-
-        if self.color_feats:
-            all_feats = [torch.sin(sin_feats), torch.cos(cos_feats), original_image]
-        else:
-            all_feats = [torch.sin(sin_feats), torch.cos(cos_feats)]
-
-        return torch.cat(all_feats, dim=1)
-
-
-# From github user @milesil (https://github.com/milesial/Pytorch-UNet)
-class DoubleConv(nn.Module):
-    """(convolution => [BN] => ReLU) * 2. Adapted to use leaky ReLu"""
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        mid_channels: int | None = None,
-        k: int = 3,
-    ):
-        super().__init__()
-        if not mid_channels:
-            mid_channels = out_channels
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                mid_channels,
-                kernel_size=k,
-                padding=floor(k / 2),
-                bias=False,
-            ),
-            nn.BatchNorm2d(mid_channels),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv2d(
-                mid_channels,
-                out_channels,
-                kernel_size=k,
-                padding=floor(k / 2),
-                bias=False,
-            ),
-            nn.BatchNorm2d(out_channels),
-            nn.LeakyReLU(inplace=True),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.double_conv(x)
-
-
-class Down(nn.Module):
-    """Downscaling with maxpool then double conv"""
-
-    def __init__(self, in_channels: int, out_channels: int, k: int = 3):
-        super().__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2), DoubleConv(in_channels, out_channels, k=k)
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.maxpool_conv(x)
-
-
-class Up(nn.Module):
-    """Upscaling then double conv"""
-
-    def __init__(
-        self,
-        in_channels: int = 128,
-        out_channels: int = 128,
-        k: int = 3,
-        learned: bool = True,
-    ):
-        super().__init__()
-        self.up: nn.Upsample | nn.ConvTranspose2d
-        # if bilinear, use the normal convolutions to reduce the number of channels
-        if learned:
-            self.conv = DoubleConv(in_channels, in_channels, k=k)
-            self.up = nn.ConvTranspose2d(
-                in_channels, out_channels, kernel_size=2, stride=2
-            )
-        else:
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, k=k)
-            self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv(x)
-        return self.up(x)
 
 
 class Downsampler(nn.Module):
@@ -332,8 +182,75 @@ class Simple(nn.Module):
         return x
 
 
-# TODO:
-# - convs before conv2DT
+class Skips(nn.Module):
+    def __init__(
+        self,
+        patch_size: int,
+        n_freq_impl: int = 10,
+        n_ch_in: int = 128,
+        k_up: int | list[int] = 5,
+        lr_weight: float = 0.5,
+        learned: bool = True,
+    ):
+        super().__init__()
+        self.patch_size = patch_size
+
+        self.lr_weight = lr_weight
+        self.implict = ImplicitFeaturizer(True, n_freq_impl, True)
+        n_ch_downsample = 3  # + n_freq_impl * 10
+
+        upsamples: list[nn.Module] = []
+        self.n_upsamples = ceil(log2(patch_size))
+        for i in range(self.n_upsamples):
+            current_k = k_up if isinstance(k_up, int) else k_up[i]
+            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k, learned)
+            upsamples.append(upsample)
+        self.upsamples = nn.ModuleList(upsamples)
+
+        # post_upsample_convs: list[nn.Module] = []
+        # for i in range(3):
+        #     post_upsample_convs.append(
+        #         DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, current_k)
+        #     )
+        # self.post_upsample_convs = nn.ModuleList(post_upsample_convs)
+        self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
+        self.conv = DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, k=current_k)
+        self.outp_conv = nn.Conv2d(n_ch_in, n_ch_in, 3, padding=1)
+
+    def _get_sizes(self, h: int, w: int, n_upsamples: int) -> list[tuple[int, int]]:
+        sizes: list[tuple[int, int]] = []
+        for i in range(n_upsamples + 1):
+            sizes.append((int(h / 2**i), int(w / 2**i)))
+        return sizes
+
+    def forward(self, img: torch.Tensor, lr_feats: torch.Tensor):
+        _, _, H, W = img.shape
+        # impl = self.implict(img)
+
+        sizes = self._get_sizes(H, W, self.n_upsamples)[::-1]
+        x_prev = F.interpolate(lr_feats, sizes[0])
+        for s, size in enumerate(sizes):
+            x_prev = F.interpolate(x_prev, size)
+            guidance = F.interpolate(img, size)
+            # resized_lr_feats = F.interpolate(lr_feats, size)
+
+            # lr_weight = self.lr_weight / (s + 1)
+
+            # x_prev = ((1 - lr_weight) * x_prev) + (lr_weight * resized_lr_feats)
+            x_cat = torch.cat((x_prev, guidance), dim=1)
+
+            if s < len(sizes) - 1:
+                x_prev = self.upsamples[s](x_cat)
+            else:
+                x_prev = self.conv(x_cat)
+
+        # for i in range(1, len(self.post_upsample_convs)):
+        #     x_prev = torch.cat((x_prev, guidance), dim=1)
+        #     x_prev = self.post_upsample_convs[i](x_prev)
+
+        x = self.outp_conv(x_prev)
+        x = F.normalize(x, 1, dim=1)
+        return x
 
 
 def test_benchmark():
@@ -365,7 +282,20 @@ def test_benchmark():
 
 
 if __name__ == "__main__":
-    # torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
+    l = 1400
+    test = torch.ones((1, 3, l, l), device="cuda:0")
+    test_lr = torch.ones((1, 128, l // 14, l // 14), device="cuda:0")
+    print(test_lr.shape)
+
+    net = Skips(14, 10).to("cuda:0").eval()
+    x = net.forward(test, test_lr)
+
+    # mem, time = measure_mem_time(test, test_lr, net)
+
+    # print(f"{mem}MB, {time}s")
+
+    """
     combined = Simple(n_convs=8).to("cuda:0").eval()
 
     l = 400
@@ -378,3 +308,4 @@ if __name__ == "__main__":
     mem, time = measure_mem_time(test, test_lr, combined)
 
     print(f"{mem}MB, {time}s")
+    """
