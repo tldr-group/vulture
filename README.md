@@ -18,10 +18,13 @@
 - should you normalize output as well?
 - above simple strategy seems to be working well but:
     - get nasty patching artefacts
-        - could try having more convs after upsampling (w/out lr feat guidance)
-        - could try weighting the features less as res intreaces
-        - could try doing (weighted) mean of feats not the product
-        - could try weihted sum of feats
+        - could try having more convs after upsampling (w/out lr feat guidance) N
+        - could try weighting the features less as res intreaces X
+        - could try doing (weighted) mean of feats not the product X
+        - could try weihted sum of feats X
+        - could try using non conv upsampling (and use bilinear instead)
+    - sums/ means not working as well as multiply for some reason
+    - adding weights to either product or means worse (initially, though evens out)
 
 
 - fundamentally 
