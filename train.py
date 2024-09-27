@@ -12,20 +12,23 @@ DEVICE = "cuda:1"
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", device=DEVICE)
 val_ds = EmbeddingDataset("data/imagenet_reduced", "val", device=DEVICE)
 
-train_dl = DataLoader(train_ds, 40, True)
+train_dl = DataLoader(train_ds, 30, True)
 val_dl = DataLoader(
     val_ds,
     20,
     True,
 )
 
-net = Skips(14, k_up=5).to(DEVICE)  # Combined(14).to(DEVICE)
+net = Skips(14, k_up=3, n_freq_impl=10, learned=False).to(
+    DEVICE
+)  # Combined(14).to(DEVICE)
 
 opt = torch.optim.AdamW(net.parameters(), lr=1e-3)
 N_EPOCHS = 5000
 SAVE_PER = 10
 
-loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
+# loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
+loss_fn = torch.nn.MSELoss(reduction="sum")
 
 
 def feed_batch_get_loss(

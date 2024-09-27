@@ -17,10 +17,26 @@ warnings.filterwarnings("ignore")
 
 FLIP_H_PROB, FLIP_V_PROB = 0.5, 0.5
 ANGLES_DEG = [0, 0, 0, 0, 90, 180, 270]
+SHIFT_DIRS = [
+    (0, 0),
+    (0, 1),
+    (1, 1),
+    (1, 0),
+    (1, -1),
+    (0, -1),
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+]
+SHIFT_DISTS = [0, 0, 1, 2, 3, 4]
 
 
 def unnorm(x: torch.Tensor) -> torch.Tensor:
     return TF.normalize(x, [-0.485, -0.456, -0.406], [1 / 0.229, 1 / 0.224, 1 / 0.225])
+
+
+def shift(x: torch.Tensor, s: int, dir: tuple[int, int]) -> torch.Tensor:
+    return torch.roll(x, (dir[0] * s, dir[1] * s), dims=(-2, -1))
 
 
 class EmbeddingDataset(Dataset):
@@ -62,6 +78,8 @@ class EmbeddingDataset(Dataset):
         flip_h: bool = torch.rand(1) > FLIP_H_PROB  # type: ignore
         flip_v: bool = torch.rand(1) > FLIP_V_PROB  # type: ignore
         rotate_deg = ANGLES_DEG[torch.randint(len(ANGLES_DEG), (1,))]
+        shift_dir = SHIFT_DIRS[torch.randint(len(SHIFT_DIRS), (1,))]
+        shift_dist = SHIFT_DISTS[torch.randint(len(SHIFT_DISTS), (1,))]
         if flip_h:
             img_tensor = TF.hflip(img_tensor)
             lr_feats = TF.hflip(lr_feats)
@@ -73,6 +91,9 @@ class EmbeddingDataset(Dataset):
         img_tensor = TF.rotate(img_tensor, rotate_deg)
         lr_feats = TF.rotate(lr_feats, rotate_deg)
         hr_feats = TF.rotate(hr_feats, rotate_deg)
+
+        img_tensor = shift(img_tensor, shift_dist, shift_dir)
+        hr_feats = shift(hr_feats, shift_dist, shift_dir)
 
         if self.norm:
             img_tensor = img_tensor.to(torch.float32)

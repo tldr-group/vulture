@@ -25,6 +25,12 @@
         - could try using non conv upsampling (and use bilinear instead)
     - sums/ means not working as well as multiply for some reason
     - adding weights to either product or means worse (initially, though evens out)
+    - adding in the lr feats does mess it up early: large blobs in centre of image
+    - adding small pixel shifts to HR feats and image seems to be working okay in ameliorating artefacts
+        - logic is that it puts lr feats and hr out of step, forces model not to over-rely on LR feats
+        - still not perfect
+    - an even more simple approach (i.e single convs, not implict feats) is desirable: is it better?
+    - multi-GPU training to speed stuff up?
 
 
 - fundamentally 

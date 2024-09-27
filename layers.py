@@ -93,7 +93,7 @@ class DoubleConv(nn.Module):
                 mid_channels,
                 kernel_size=k,
                 padding=floor(k / 2),
-                bias=False,
+                bias=True,
             ),
             nn.BatchNorm2d(mid_channels),
             nn.LeakyReLU(inplace=True),
@@ -123,16 +123,17 @@ class Up(nn.Module):
         learned: bool = True,
     ):
         super().__init__()
-        self.up: nn.Upsample | nn.ConvTranspose2d
+        self.up: nn.Sequential | nn.ConvTranspose2d
         if learned:
             self.conv = DoubleConv(in_channels, in_channels, k=k)
             self.up = nn.ConvTranspose2d(
                 in_channels, out_channels, kernel_size=2, stride=2
             )
         else:
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, k=k)
-            self.up = nn.Upsample(
-                scale_factor=2, mode="nearest-exact", align_corners=True
+            self.conv = DoubleConv(in_channels, out_channels, in_channels, k=k)
+            self.up = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+                nn.Conv2d(out_channels, out_channels, k, padding=floor(k / 2)),
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

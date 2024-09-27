@@ -189,8 +189,8 @@ class Skips(nn.Module):
         n_freq_impl: int = 10,
         n_ch_in: int = 128,
         k_up: int | list[int] = 5,
-        lr_weight: float = 0.5,
-        learned: bool = True,
+        lr_weight: float = 0.4,
+        learned: bool = False,
     ):
         super().__init__()
         self.patch_size = patch_size
@@ -216,6 +216,7 @@ class Skips(nn.Module):
         self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
         self.conv = DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, k=current_k)
         self.outp_conv = nn.Conv2d(n_ch_in, n_ch_in, 3, padding=1)
+        self.mlp = nn.Conv2d(n_ch_in, n_ch_in, 1)
 
     def _get_sizes(self, h: int, w: int, n_upsamples: int) -> list[tuple[int, int]]:
         sizes: list[tuple[int, int]] = []
@@ -234,12 +235,10 @@ class Skips(nn.Module):
             guidance = F.interpolate(impl, size)
             resized_lr_feats = F.interpolate(lr_feats, size)
 
-            lr_weight = self.lr_weight / (s + 1)
-
+            lr_weight = self.lr_weight / (2 * (s + 1))
             x_prev = ((1 - lr_weight) * x_prev) * (lr_weight * resized_lr_feats)
             # x_prev = x_prev * resized_lr_feats
             x_cat = torch.cat((x_prev, guidance), dim=1)
-
             if s < len(sizes) - 1:
                 x_prev = self.upsamples[s](x_cat)
             else:
@@ -250,6 +249,7 @@ class Skips(nn.Module):
         #     x_prev = self.post_upsample_convs[i](x_prev)
 
         x = self.outp_conv(x_prev)
+        x = self.mlp(x)
         x = F.normalize(x, 1, dim=1)
         return x
 
@@ -291,10 +291,11 @@ if __name__ == "__main__":
 
     net = Skips(14, 10).to("cuda:0").eval()
     x = net.forward(test, test_lr)
+    print(x.shape)
 
-    # mem, time = measure_mem_time(test, test_lr, net)
+    mem, time = measure_mem_time(test, test_lr, net)
 
-    # print(f"{mem}MB, {time}s")
+    print(f"{mem}MB, {time}s")
 
     """
     combined = Simple(n_convs=8).to("cuda:0").eval()
