@@ -66,7 +66,6 @@ class Upsampler(nn.Module):
         n_ch_in: int = 128,
         n_ch_downsample: int = 119,
         k: int | list[int] = 3,
-        learned: bool = True,
     ):
         super().__init__()
 
@@ -81,7 +80,7 @@ class Upsampler(nn.Module):
         n_upsamples = ceil(log2(patch_size))
         for i in range(n_upsamples):
             current_k = k if isinstance(k, int) else k[i]
-            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k, learned)
+            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k)
             upsamples.append(upsample)
         self.upsamples = nn.ModuleList(upsamples)
 
@@ -116,15 +115,12 @@ class Combined(nn.Module):
         n_ch_downsample: int = 64,
         k_down: int | list[int] = 3,
         k_up: int | list[int] = 3,
-        learned: bool = True,
     ):
         super().__init__()
 
-        self.downsampler = Downsampler(
-            patch_size, n_ch_img, n_ch_downsample, k_down, learned
-        )
+        self.downsampler = Downsampler(patch_size, n_ch_img, n_ch_downsample, k_down)
         n_guidance_dims = n_ch_downsample + 3  # + self.downsampler.freq_dims
-        self.upsampler = Upsampler(patch_size, n_ch_in, n_guidance_dims, k_up, learned)
+        self.upsampler = Upsampler(patch_size, n_ch_in, n_guidance_dims, k_up)
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
         downsamples: list[torch.Tensor] = self.downsampler(img)[::-1]

@@ -120,21 +120,22 @@ class Up(nn.Module):
         in_channels: int = 128,
         out_channels: int = 128,
         k: int = 3,
-        learned: bool = True,
     ):
         super().__init__()
         self.up: nn.Sequential | nn.ConvTranspose2d
+        """
         if learned:
             self.conv = DoubleConv(in_channels, in_channels, k=k)
             self.up = nn.ConvTranspose2d(
                 in_channels, out_channels, kernel_size=2, stride=2
             )
         else:
-            self.conv = DoubleConv(in_channels, out_channels, in_channels, k=k)
-            self.up = nn.Sequential(
-                nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
-                nn.Conv2d(out_channels, out_channels, k, padding=floor(k / 2)),
-            )
+        """
+        self.conv = DoubleConv(in_channels, out_channels, in_channels, k=k)
+        self.up = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(out_channels, out_channels, k, padding=floor(k / 2)),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv(x)
