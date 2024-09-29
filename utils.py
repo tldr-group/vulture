@@ -94,7 +94,7 @@ def visualise(
     n_rows = 4 if isinstance(pred_hr_feats, torch.Tensor) else 3
     arrs = get_arrs_from_batch(img, lr_feats, hr_feats, pred_hr_feats)
     fig, axs = plt.subplots(nrows=n_rows, ncols=len(arrs))
-    fig.set_size_inches(24, 12)
+    fig.set_size_inches(32, 4.4)
     for i, arr in enumerate(arrs):
         for j, sub_arr in enumerate(arr):
             if len(arrs) == 1:

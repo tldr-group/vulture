@@ -104,7 +104,7 @@ class Upsampler(nn.Module):
             if (i < self.n_upsamples // 2) and self.add_lr_guidance:
                 _, _, h, w = x.shape
                 resized_lr_feats = F.interpolate(lr_feats, (h, w))
-                x = ((1 - self.lr_weight) * x) + (self.lr_weight * resized_lr_feats)
+                x = ((1 - self.lr_weight) * x) * (self.lr_weight * resized_lr_feats)
             x_in = torch.cat((x, guidance), dim=1)
             x = layer(x_in)
             i += 1
@@ -124,12 +124,21 @@ class Combined(nn.Module):
         n_ch_downsample: int = 64,
         k_down: int | list[int] = 3,
         k_up: int | list[int] = 3,
+        feat_weight: float = -1,
     ):
         super().__init__()
 
-        self.downsampler = Downsampler(patch_size, n_ch_img, n_ch_downsample, k_down)
+        self.downsampler = Downsampler(patch_size, n_ch_img, n_ch_downsample, k=k_down)
         n_guidance_dims = n_ch_downsample + 3  # + self.downsampler.freq_dims
-        self.upsampler = Upsampler(patch_size, n_ch_in, n_guidance_dims, k_up)
+        add_feats = feat_weight > 0
+        self.upsampler = Upsampler(
+            patch_size,
+            n_ch_in,
+            n_guidance_dims,
+            k_up,
+            add_feats=add_feats,
+            feat_weight=feat_weight,
+        )
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
         downsamples: list[torch.Tensor] = self.downsampler(img)[::-1]

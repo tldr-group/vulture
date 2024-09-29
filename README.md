@@ -32,8 +32,22 @@
     - an even more simple approach (i.e single convs, not implict feats) is desirable: is it better?
     - multi-GPU training to speed stuff up?
 
-
-- fundamentally 
+## Notes 27/09/24:
+- model struggles if not adding semantics
+- what I want is to break the 10k loss for smooth L1 with 20 validation images
+- learned downsample has some nice properties: will pxiel shift trs help it?
+    - the loss does drop very quickly between epochs
+    - sharp resolution in some areas, but lots of blurring otherwise
+    - will adding feature skips help or hindr?
+    
+## Notes 29/09/24:
+- bumped nch for learned downsampler
+- do I need to add feature guidance in the upsampler - or will that cause the patching problem?
+- definite problems with smooth background images: seeing the DINOv2 anomalous bg token effect. Fix in future by moving to DINOv2_reg for featurizer and recompute the features (expensive). Maybe starting with implict model pretrained on old features will help?
+- promising: learned down + img guidance + feature guidance (first two upsamples, weight=0.25) + 32 batch + k=3 (might increase in future) + lr=1e-3
+- worry: small k could work for small input image sizes as global information can be passed but at large image size (i.e materials images) this could not be communicated. 
+    - Larger k + multi-resolution training should be considered in future.
+    - FeatUP seems to think you can get features out at any resolution from a trained implict upsampler by 'querying the pixel field' - this could come in handy
 
 
 ## Model:
