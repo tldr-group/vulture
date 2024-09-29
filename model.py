@@ -18,50 +18,44 @@ class Downsampler(nn.Module):
         self,
         patch_size: int,
         n_ch_in: int = 3,
-        n_ch_out: int = 16,
+        n_ch_out: int = 64,
+        n_ch_guidance: int = 3,
         k: int | list[int] = 3,
-        learned: bool = True,
     ):
         super().__init__()
         self.patch_size = patch_size
         self.n_ch_out = n_ch_out
 
         n_downsamples = ceil(log2(patch_size))
-        prev_ch = n_ch_in
-
         layers = []
         for i in range(n_downsamples):
             out_ch = n_ch_out
-            downsample: Down | nn.MaxPool2d
-            if learned:
-                current_k = k if isinstance(k, int) else k[i]
-                downsample = Down(prev_ch, out_ch, current_k)
-            else:
-                downsample = nn.MaxPool2d(2)
+            prev_ch = n_ch_out + n_ch_guidance if i > 0 else n_ch_in
+            current_k = k if isinstance(k, int) else k[i]
+
+            downsample = Down(prev_ch, out_ch, current_k)
             layers.append(downsample)
-            prev_ch = out_ch
         self.downsample_layers = nn.ModuleList(layers)
 
-        self.n_freqs = 10
-        self.implict = ImplicitFeaturizer(True, self.n_freqs)
-        self.freq_dims = 3 + self.n_freqs * 10
+        # self.n_freqs = 10
+        # self.implict = ImplicitFeaturizer(True, self.n_freqs)
+        # self.freq_dims = 3 + self.n_freqs * 10
 
-    def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
-        _, _, H, W = x.shape
+    def forward(self, img: torch.Tensor) -> list[torch.Tensor]:
+        _, _, H, W = img.shape
         out_h, out_w = floor(H / self.patch_size), floor(W / self.patch_size)
         downsamples: list[torch.Tensor] = []
-        x_prev, x_impl = x, self.implict(x)
-        x_cat = torch.cat((x_prev, x_impl), dim=1)
+
+        x_cat = img
         for layer in self.downsample_layers:
             downsamples.append(x_cat)
-            x_prev = layer(x_prev)
+            x_prev = layer(x_cat)
             _, _, h, w = x_prev.shape
-            x_impl = self.implict(F.interpolate(x, (h, w)))
-            x_cat = torch.cat((x_prev, x_impl), dim=1)
+            resized_guidance = F.interpolate(img, (h, w))
+            x_cat = torch.cat((x_prev, resized_guidance), dim=1)
 
-        x_final = F.interpolate(x_prev, (out_h, out_w))
-        x_impl = self.implict(F.interpolate(x, (out_h, out_w)))
-        downsamples.append(torch.cat((x_final, x_impl), dim=1))
+        x_final = F.interpolate(x_cat, (out_h, out_w))
+        downsamples.append(x_final)
         return downsamples
 
 
@@ -119,7 +113,7 @@ class Combined(nn.Module):
         patch_size: int,
         n_ch_img: int = 3,
         n_ch_in: int = 128,
-        n_ch_downsample: int = 16,
+        n_ch_downsample: int = 64,
         k_down: int | list[int] = 3,
         k_up: int | list[int] = 3,
         learned: bool = True,
@@ -129,7 +123,7 @@ class Combined(nn.Module):
         self.downsampler = Downsampler(
             patch_size, n_ch_img, n_ch_downsample, k_down, learned
         )
-        n_guidance_dims = n_ch_downsample + self.downsampler.freq_dims
+        n_guidance_dims = n_ch_downsample + 3  # + self.downsampler.freq_dims
         self.upsampler = Upsampler(patch_size, n_ch_in, n_guidance_dims, k_up, learned)
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
@@ -235,8 +229,9 @@ class Skips(nn.Module):
             guidance = F.interpolate(impl, size)
             resized_lr_feats = F.interpolate(lr_feats, size)
 
-            lr_weight = self.lr_weight / (2 * (s + 1))
-            x_prev = ((1 - lr_weight) * x_prev) * (lr_weight * resized_lr_feats)
+            if s < len(sizes) // 2:
+                lr_weight = self.lr_weight / (2 * (s + 1))
+                x_prev = ((1 - lr_weight) * x_prev) * (lr_weight * resized_lr_feats)
             # x_prev = x_prev * resized_lr_feats
             x_cat = torch.cat((x_prev, guidance), dim=1)
             if s < len(sizes) - 1:
@@ -284,12 +279,18 @@ def test_benchmark():
 
 if __name__ == "__main__":
     torch.cuda.empty_cache()
-    l = 1400
+    l = 224
     test = torch.ones((1, 3, l, l), device="cuda:0")
     test_lr = torch.ones((1, 128, l // 14, l // 14), device="cuda:0")
     print(test_lr.shape)
 
-    net = Skips(14, 10).to("cuda:0").eval()
+    net = (
+        Combined(
+            14,
+        )
+        .to("cuda:0")
+        .eval()
+    )
     x = net.forward(test, test_lr)
     print(x.shape)
 
