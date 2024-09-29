@@ -60,7 +60,13 @@
     - (multiplicative) feature guidance in first half of the layers in the upsampler, with feature weight=0.25
     - LR=1e-3, batch size 32
     - N_epochs=5000
-    - good results after 230 ish epochs
+    - good results after 230 ish epochs!!
+- problem - the lr feats I use as my training input (from featup) is actually a pca over a series of features of 50 transforms of the image (jitters/zooms/etc)
+    - model now trained to use those (and not the dv2 features of a single image)
+    - can hopefully be trained to just use one set of dv2 features - might improve perf, but might not as those transforms contain some info
+    - will have to go through all splits and compute proper dv2 features for them
+    - opens up possiblity to have contractive model (i.e one that goes from 384 -> 128 dims over the layers) but that means can't do feature guidance in second layer as easily
+        - does that mean get rid of feature guidance? idk how much it does as only in first two layers
 
 
 ## Model:
