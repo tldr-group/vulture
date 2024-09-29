@@ -66,6 +66,8 @@ class Upsampler(nn.Module):
         n_ch_in: int = 128,
         n_ch_downsample: int = 119,
         k: int | list[int] = 3,
+        add_feats: bool = False,
+        feat_weight: float = 0.3,
     ):
         super().__init__()
 
@@ -77,12 +79,15 @@ class Upsampler(nn.Module):
         self.act = nn.Tanh()
 
         upsamples: list[nn.Module] = []
-        n_upsamples = ceil(log2(patch_size))
-        for i in range(n_upsamples):
+        self.n_upsamples = ceil(log2(patch_size))
+        for i in range(self.n_upsamples):
             current_k = k if isinstance(k, int) else k[i]
             upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k)
             upsamples.append(upsample)
         self.upsamples = nn.ModuleList(upsamples)
+
+        self.add_lr_guidance = add_feats
+        self.lr_weight = feat_weight
 
     def forward(
         self, lr_feats: torch.Tensor, downsamples: list[torch.Tensor]
@@ -96,6 +101,10 @@ class Upsampler(nn.Module):
         for layer, guidance in zip(self.upsamples, downsamples):
             if i == 1:
                 x = F.interpolate(x, (double_h, double_w))
+            if (i < self.n_upsamples // 2) and self.add_lr_guidance:
+                _, _, h, w = x.shape
+                resized_lr_feats = F.interpolate(lr_feats, (h, w))
+                x = ((1 - self.lr_weight) * x) + (self.lr_weight * resized_lr_feats)
             x_in = torch.cat((x, guidance), dim=1)
             x = layer(x_in)
             i += 1
