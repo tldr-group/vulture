@@ -25,7 +25,7 @@ dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE).half()
 
 
-upsampler = torch.load("e460.pth")
+upsampler = torch.load("apply_models/e840.pth")
 """
 Combined(
     14, n_ch_img=3, n_ch_in=128, n_ch_downsample=64, k_up=3, feat_weight=0.25
@@ -33,7 +33,9 @@ Combined(
 """
 upsampler: Combined = upsampler.eval().to(DEVICE)
 
-path = "data/compare/default_image.jpg"
+path = "data/compare/LCSF.png"
+
+# 500 ,375
 L = 224 * 3
 _img = Image.open(path).convert("RGB").resize((L, L))
 _h, _w = _img.height, _img.width
@@ -41,7 +43,7 @@ _h, _w = _img.height, _img.width
 norm = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 tr = T.Compose(
     [
-        T.Resize(L),
+        T.Resize((L, L)),
         T.CenterCrop((L, L)),
         T.ToTensor(),
         norm,

@@ -66,7 +66,13 @@
     - can hopefully be trained to just use one set of dv2 features - might improve perf, but might not as those transforms contain some info
     - will have to go through all splits and compute proper dv2 features for them
     - opens up possiblity to have contractive model (i.e one that goes from 384 -> 128 dims over the layers) but that means can't do feature guidance in second layer as easily
-        - does that mean get rid of feature guidance? idk how much it does as only in first two layers
+        - does that mean get rid of feature guidance? idk how much it does as only in first two layers and in the
+- tomorrow:
+    - get vanilla dv2 embeddings for all train & val data, dim 384 (and 128?)
+    - get stuff working for images that aren't multiples of 224 - test w/ rectangles as well
+    - try train a contractive net:
+        - w/out feature guidance
+        - w/out pixel shifts in dataset (cause of blurring?)
 
 
 ## Model:
