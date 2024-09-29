@@ -48,6 +48,19 @@
 - worry: small k could work for small input image sizes as global information can be passed but at large image size (i.e materials images) this could not be communicated. 
     - Larger k + multi-resolution training should be considered in future.
     - FeatUP seems to think you can get features out at any resolution from a trained implict upsampler by 'querying the pixel field' - this could come in handy
+- maybe the pixel shifting transforms aren't good and encourage blurring
+- is sharpness the last step i.e it only offers incremental improvements in the loss so won't happen till the end
+    - will it happen at all if the model gets stuck in discrepenacy between the featup feats and the dv2 lr feats
+    - or the featup feats and the conv features it's able to reproduce?
+- seems like this approach is working!
+    - parameters:
+    - learned downsampler, n_ch=65 (+3 for img)
+    - kernel size=3
+    - resize image guidance in downsampler, no implict features
+    - (multiplicative) feature guidance in first half of the layers in the upsampler, with feature weight=0.25
+    - LR=1e-3, batch size 32
+    - N_epochs=5000
+    - good results after 230 ish epochs
 
 
 ## Model:
