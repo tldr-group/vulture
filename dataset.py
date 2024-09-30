@@ -117,7 +117,7 @@ class EmbeddingDataset(Dataset):
         )
         # dataloader will batch for us
         lr_feats, hr_feats = (
-            embedding_data["lr_feats"][0],
+            embedding_data["dv2_lr_feats"][0],
             embedding_data["hr_feats"][0],
         )
 

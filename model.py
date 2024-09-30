@@ -64,7 +64,8 @@ class Upsampler(nn.Module):
         self,
         patch_size: int,
         n_ch_in: int = 128,
-        n_ch_downsample: int = 119,
+        n_ch_out: int = 128,
+        n_ch_downsample: int = 67,
         k: int | list[int] = 3,
         add_feats: bool = False,
         feat_weight: float = 0.3,
@@ -73,16 +74,21 @@ class Upsampler(nn.Module):
 
         self.patch_size = patch_size
         self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
-        self.outp_conv = nn.Conv2d(n_ch_in, n_ch_in, 3, padding=1)
-        self.mlp = nn.Conv2d(n_ch_in, n_ch_in, 1)
-        # consider add a conv kernel size=1 at the end and removing tanh activation
-        self.act = nn.Tanh()
+        self.outp_conv = nn.Conv2d(n_ch_out, n_ch_out, 3, padding=1)
+        self.mlp = nn.Conv2d(n_ch_out, n_ch_out, 1)
 
         upsamples: list[nn.Module] = []
         self.n_upsamples = ceil(log2(patch_size))
+
+        if n_ch_in != n_ch_out:
+            chs = list(np.linspace(n_ch_in, n_ch_out, self.n_upsamples, dtype=np.int32))
+        else:
+            chs = [n_ch_in for i in range(self.n_upsamples)]
+
         for i in range(self.n_upsamples):
             current_k = k if isinstance(k, int) else k[i]
-            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k)
+            in_ch = n_ch_in if i == 0 else chs[i - 1]
+            upsample = Up(in_ch + n_ch_downsample, chs[i], current_k)
             upsamples.append(upsample)
         self.upsamples = nn.ModuleList(upsamples)
 
@@ -99,12 +105,15 @@ class Upsampler(nn.Module):
         x = self.inp_conv(x)  # mix info before Conv2DT
         i = 0
         for layer, guidance in zip(self.upsamples, downsamples):
-            if i == 1:
-                x = F.interpolate(x, (double_h, double_w))
+            _, _, gh, gw = guidance.shape
+            x = F.interpolate(x, (gh, gw))
+            # if i == 1:
+            #    x = F.interpolate(x, (double_h, double_w))
             if (i < self.n_upsamples // 2) and self.add_lr_guidance:
                 _, _, h, w = x.shape
                 resized_lr_feats = F.interpolate(lr_feats, (h, w))
                 x = ((1 - self.lr_weight) * x) * (self.lr_weight * resized_lr_feats)
+            # print(x.shape, guidance.shape)
             x_in = torch.cat((x, guidance), dim=1)
             x = layer(x_in)
             i += 1
@@ -121,6 +130,7 @@ class Combined(nn.Module):
         patch_size: int,
         n_ch_img: int = 3,
         n_ch_in: int = 128,
+        n_ch_out: int = 128,
         n_ch_downsample: int = 64,
         k_down: int | list[int] = 3,
         k_up: int | list[int] = 3,
@@ -134,6 +144,7 @@ class Combined(nn.Module):
         self.upsampler = Upsampler(
             patch_size,
             n_ch_in,
+            n_ch_out,
             n_guidance_dims,
             k_up,
             add_feats=add_feats,
@@ -293,14 +304,14 @@ def test_benchmark():
 
 if __name__ == "__main__":
     torch.cuda.empty_cache()
-    l = 224
-    test = torch.ones((1, 3, l, l), device="cuda:0")
-    test_lr = torch.ones((1, 128, l // 14, l // 14), device="cuda:0")
-    print(test_lr.shape)
+    l = 224 + 14
+    test = torch.ones((1, 3, 2 * l, l), device="cuda:0")
+    test_lr = torch.ones((1, 384, (2 * l) // 14, l // 14), device="cuda:0")
 
     net = (
         Combined(
             14,
+            n_ch_in=384,
         )
         .to("cuda:0")
         .eval()
