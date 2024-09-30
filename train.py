@@ -3,29 +3,41 @@ import torch.nn as nn
 
 from dataset import EmbeddingDataset, DataLoader, unnorm
 from model import Combined, Simple, Skips
-from utils import visualise, plot_losses
+from utils import visualise, plot_losses, expriment_from_json
+
 
 torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-train_ds = EmbeddingDataset("data/imagenet_reduced", "train", device=DEVICE)
-val_ds = EmbeddingDataset("data/imagenet_reduced", "val", device=DEVICE)
+expr = expriment_from_json("configs/contract_combined_no_shift.json")
 
-train_dl = DataLoader(train_ds, 32, True)
+train_ds = EmbeddingDataset("data/imagenet_reduced", "train", expr=expr, device=DEVICE)
+val_ds = EmbeddingDataset("data/imagenet_reduced", "val", expr=expr, device=DEVICE)
+
+train_dl = DataLoader(train_ds, expr.batch_size, True)
 val_dl = DataLoader(
     val_ds,
-    32,
+    expr.batch_size,
     True,
 )
 
-net = Combined(14, k_up=3, feat_weight=0.25).to(DEVICE)  # Combined(14).to(DEVICE)
+net = Combined(
+    expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
+).to(DEVICE)
 
-opt = torch.optim.AdamW(net.parameters(), lr=1e-3)
-N_EPOCHS = 5000
-SAVE_PER = 10
 
-loss_fn = torch.nn.SmoothL1Loss(reduction="sum")
+opt_dict = {
+    "adamw": torch.optim.AdamW,
+    "adam": torch.optim.Adam,
+    "SGD": torch.optim.SGD,
+}
+opt: torch.optim.Optimizer = opt_dict[expr.optim](net.parameters(), lr=expr.lr)
+N_EPOCHS = expr.n_epochs
+SAVE_PER = expr.save_per
+
+loss_dict: dict = {"smooth_l1": nn.SmoothL1Loss, "l1": nn.L1Loss, "l2": nn.MSELoss}
+loss_fn: nn.modules.loss._Loss = loss_dict[expr.loss](reduction="sum")
 # loss_fn = torch.nn.MSELoss(reduction="sum")
 
 
@@ -94,4 +106,4 @@ for i in range(N_EPOCHS):
 
         if val_loss < best_val_loss:
             # todo: save net.state_dict() rather than net
-            torch.save(net, f"experiments/current/best.pth")
+            torch.save(net.state_dict(), f"experiments/current/best.pth")
