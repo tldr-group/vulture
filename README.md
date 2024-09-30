@@ -69,6 +69,8 @@
         - does that mean get rid of feature guidance? idk how much it does as only in first two layers and in the
 - tomorrow:
     - get vanilla dv2 embeddings for all train & val data, dim 384 (and 128?)
+    - parametrise everything with a json file
+    - torch seed stuff
     - get stuff working for images that aren't multiples of 224 - test w/ rectangles as well
     - try train a contractive net:
         - w/out feature guidance
