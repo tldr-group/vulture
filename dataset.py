@@ -6,7 +6,7 @@ from os import listdir
 from PIL import Image
 from typing import Literal
 
-from utils import visualise
+from utils import visualise, Experiment
 
 
 import warnings
@@ -14,21 +14,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # transforms: flips (ud, lr, ud-lr), rotations (90, 180, 270)
-
-FLIP_H_PROB, FLIP_V_PROB = 0.5, 0.5
-ANGLES_DEG = [0, 0, 0, 0, 90, 180, 270]
-SHIFT_DIRS = [
-    (0, 0),
-    (0, 1),
-    (1, 1),
-    (1, 0),
-    (1, -1),
-    (0, -1),
-    (-1, -1),
-    (-1, 0),
-    (-1, 1),
-]
-SHIFT_DISTS = [0, 0, 1, 2, 3, 4]
 
 
 def unnorm(x: torch.Tensor) -> torch.Tensor:
@@ -45,9 +30,9 @@ class EmbeddingDataset(Dataset):
         self,
         root_dir: str,
         which: Literal["train", "val"],
+        expr: Experiment,
         using_splits: bool = True,
         device: str = "cuda:0",
-        norm: bool = True,
     ) -> None:
         super().__init__()
 
@@ -65,7 +50,7 @@ class EmbeddingDataset(Dataset):
         self.img_dir = (
             f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         )
-        self.norm = norm
+        self.expr = expr
 
     def __len__(self):
         return self.n
@@ -75,11 +60,15 @@ class EmbeddingDataset(Dataset):
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         img_tensor = TF.pil_to_tensor(img)
-        flip_h: bool = torch.rand(1) > FLIP_H_PROB  # type: ignore
-        flip_v: bool = torch.rand(1) > FLIP_V_PROB  # type: ignore
-        rotate_deg = ANGLES_DEG[torch.randint(len(ANGLES_DEG), (1,))]
-        shift_dir = SHIFT_DIRS[torch.randint(len(SHIFT_DIRS), (1,))]
-        shift_dist = SHIFT_DISTS[torch.randint(len(SHIFT_DISTS), (1,))]
+        flip_h: bool = torch.rand(1) < self.expr.flip_h_prob  # type: ignore
+        flip_v: bool = torch.rand(1) < self.expr.flip_v_prob  # type: ignore
+
+        angles_deg, shift_dirs, shift_dists = (
+            self.expr.angles_deg,
+            self.expr.shift_dirs,
+            self.expr.shift_dists,
+        )
+
         if flip_h:
             img_tensor = TF.hflip(img_tensor)
             lr_feats = TF.hflip(lr_feats)
@@ -88,14 +77,20 @@ class EmbeddingDataset(Dataset):
             img_tensor = TF.vflip(img_tensor)
             lr_feats = TF.vflip(lr_feats)
             hr_feats = TF.vflip(hr_feats)
-        img_tensor = TF.rotate(img_tensor, rotate_deg)
-        lr_feats = TF.rotate(lr_feats, rotate_deg)
-        hr_feats = TF.rotate(hr_feats, rotate_deg)
 
-        img_tensor = shift(img_tensor, shift_dist, shift_dir)
-        hr_feats = shift(hr_feats, shift_dist, shift_dir)
+        if len(angles_deg) > 0:
+            rotate_deg = angles_deg[torch.randint(len(angles_deg), (1,))]
+            img_tensor = TF.rotate(img_tensor, rotate_deg)
+            lr_feats = TF.rotate(lr_feats, rotate_deg)
+            hr_feats = TF.rotate(hr_feats, rotate_deg)
 
-        if self.norm:
+        if len(shift_dirs) > 0 and len(shift_dists) > 0:
+            shift_dir = shift_dirs[torch.randint(len(shift_dirs), (1,))]
+            shift_dist = shift_dists[torch.randint(len(shift_dists), (1,))]
+            img_tensor = shift(img_tensor, shift_dist, shift_dir)
+            hr_feats = shift(hr_feats, shift_dist, shift_dir)
+
+        if self.expr.norm:
             img_tensor = img_tensor.to(torch.float32)
             img_tensor = TF.normalize(
                 img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
@@ -129,8 +124,28 @@ class EmbeddingDataset(Dataset):
 
 
 if __name__ == "__main__":
-    ds = EmbeddingDataset("data/imagenet_reduced", "train")
+    ds = EmbeddingDataset("data/imagenet_reduced", "train", Experiment("test"))
     dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)
     visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "batch_vis.png")
+
+
+""""
+
+
+FLIP_H_PROB, FLIP_V_PROB = 0.5, 0.5
+ANGLES_DEG = [0, 0, 0, 0, 90, 180, 270]
+SHIFT_DIRS = [
+    (0, 0),
+    (0, 1),
+    (1, 1),
+    (1, 0),
+    (1, -1),
+    (0, -1),
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+]
+SHIFT_DISTS = [0, 0, 1, 2, 3, 4]
+"""
