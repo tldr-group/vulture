@@ -12,15 +12,17 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-from types import MethodType
-from typing import Callable, Literal
 
 from time import time_ns
 from PIL import Image
 import matplotlib.pyplot as plt
 
-
+from types import MethodType
+from typing import Callable, Literal
 from collections import defaultdict
+from dataclasses import dataclass, field
+
+from json import load as load_json
 
 from tqdm import tqdm
 
@@ -34,6 +36,53 @@ norm_dict = {
     "minmax": MinMaxScaler(feature_range=(0, 1), clip=True, copy=False),
     "std": StandardScaler(copy=False),
 }
+
+
+# ========================= TYPES =========================
+
+
+@dataclass
+class Experiment:
+    name: str
+    net_type: Literal["combined", "simple", "skips"] = "combined"
+    k: int = 3
+    n_ch_in: int = 384
+    n_ch_out: int = 128
+    n_ch_guidance: int = 3
+    n_ch_downsampler: int = 64
+    feat_weight: float = -1
+    patch_size: int = 14
+
+    flip_h_prob: float = 0.5
+    flip_v_prob: float = 0.5
+    angles_deg: list[int] = field(default_factory=lambda: [0, 0, 0, 0, 90, 180, 270])
+    shift_dirs: list[tuple[int, int]] = field(default_factory=lambda: [])
+    shift_dists: list[int] = field(default_factory=lambda: [])
+    norm: bool = True
+
+    loss: Literal["smooth_l1", "l1", "l2"] = "smooth_l1"
+    optim: Literal["adamw", "adam", "SGD"] = "adamw"
+    lr: float = 1e-3
+    batch_size: int = 32
+    n_epochs: int = 5000
+    save_per: int = 10
+
+
+def expriment_from_json(json_obj_or_path: dict | str) -> Experiment:
+    config: dict
+    if isinstance(json_obj_or_path, str):
+        with open(json_obj_or_path) as f:
+            config = load_json(f)
+    else:
+        config = json_obj_or_path
+    for key in ("net", "transforms", "training"):
+        for subkey, subval in config[key].items():
+            config[subkey] = subval
+        config.pop(key)
+    config["net_type"] = config["type"]
+    config.pop("type")
+
+    return Experiment(**config)
 
 
 # ========================= UPGRADES =========================
