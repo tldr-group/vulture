@@ -7,6 +7,8 @@ from os import listdir
 from PIL import Image
 from featup.train_implicit_upsampler import my_app
 
+from utils import do_2D_pca, to_numpy, do_pca
+
 torch.manual_seed(1001)
 
 DEVICE = "cuda:0"
@@ -37,6 +39,7 @@ tr = T.Compose(
 )
 
 
+@torch.no_grad()
 def gen_original_dv2_embeds(model: torch.nn.Module, folder: str) -> None:
     data_path = "data/imagenet_reduced"
     for i, fname in enumerate(listdir(f"{data_path}/{folder}")):
@@ -51,11 +54,18 @@ def gen_original_dv2_embeds(model: torch.nn.Module, folder: str) -> None:
         feat_dict: dict = model.forward_features(tensor)
         feats = feat_dict["x_norm_patchtokens"]
         _, nt, c = feats.shape
-        feats = feats.permute((0, 2, 1))
-        feats = feats.reshape((b, c, nt_h, nt_w)).detach().cpu()
+        # feats = feats.permute((0, 2, 1))
+
+        feats_np = to_numpy(feats.detach())[0]
+        reduced = do_pca(feats_np, 128)
+
+        # feats = feats.reshape((b, c, nt_h, nt_w)).detach().cpu()
+
+        # reduced = do_2D_pca(to_numpy(feats), 128)
+        reduced_tensor = torch.tensor(reduced).T.reshape((1, 128, nt_h, nt_w))
 
         data = torch.load(f"{data_path}/{folder}/{fname}", weights_only=True)
-        data["dv2_lr_feats"] = feats
+        data["dv2_lr_feats_reduced"] = reduced_tensor
         torch.save(data, f"{data_path}/{folder}/{fname}")
 
         print(i)
@@ -72,5 +82,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # so far have done 0 and 2
     # need to do 3, 4, 5, 6, 7, 8, 9
-    start_featup(args.n)
-    # gen_original_dv2_embeds(dv2, "data")
+    # start_featup(args.n)
+    gen_original_dv2_embeds(dv2, "data")

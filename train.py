@@ -10,7 +10,8 @@ torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("configs/contract_combined_no_shift.json")
+expr = expriment_from_json("configs/combined_no_shift.json")
+print(expr)
 
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", expr=expr, device=DEVICE)
 val_ds = EmbeddingDataset("data/imagenet_reduced", "val", expr=expr, device=DEVICE)

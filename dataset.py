@@ -112,7 +112,7 @@ class EmbeddingDataset(Dataset):
         )
         # dataloader will batch for us
         lr_feats, hr_feats = (
-            embedding_data["dv2_lr_feats"][0],
+            embedding_data["dv2_lr_feats_reduced"][0],
             embedding_data["hr_feats"][0],
         )
 
@@ -124,7 +124,7 @@ class EmbeddingDataset(Dataset):
 
 
 if __name__ == "__main__":
-    ds = EmbeddingDataset("data/imagenet_reduced", "train", Experiment("test"))
+    ds = EmbeddingDataset("data/imagenet_reduced", "val", Experiment("test"))
     dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)
