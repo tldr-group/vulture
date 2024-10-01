@@ -25,7 +25,7 @@ dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE).half()
 
 
-upsampler = torch.load("apply_models/e840.pth")
+upsampler = torch.load("apply_models/e870.pth")
 """
 Combined(
     14, n_ch_img=3, n_ch_in=128, n_ch_downsample=64, k_up=3, feat_weight=0.25
@@ -33,10 +33,10 @@ Combined(
 """
 upsampler: Combined = upsampler.eval().to(DEVICE)
 
-path = "data/compare/LCSF.png"
+path = "data/compare/81.png"
 
 # 500 ,375
-L = 224 * 3
+L = 224 * 2
 _img = Image.open(path).convert("RGB").resize((L, L))
 _h, _w = _img.height, _img.width
 # tr = closest_crop(_h, _w)

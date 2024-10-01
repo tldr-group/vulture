@@ -116,6 +116,8 @@
 - feature transfer seems tougher than expected:
     -  maybe l1 loss can help for sharpness
     - maybe some form of image guidance is required (annoying as expensive)
+    - still seems tough to learn the semantic mapping (spatial is fine though)
+    - large kernel size + ciruclar padding might work well as can reproduce the padding effect of the jittering
 
 
 ## Model:

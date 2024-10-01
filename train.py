@@ -27,7 +27,9 @@ val_dl = DataLoader(
 #     expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
 # ).to(DEVICE)
 
-net = FeatureTransfer(k=expr.k, n_ch_in=expr.n_ch_in).to(DEVICE)
+net = FeatureTransfer(
+    k=expr.k, n_ch_in=expr.n_ch_in, padding_mode=expr.padding_mode
+).to(DEVICE)
 init_weights(net, expr.weights_init)
 
 

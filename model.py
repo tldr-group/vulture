@@ -21,6 +21,7 @@ class Downsampler(nn.Module):
         n_ch_out: int = 64,
         n_ch_guidance: int = 3,
         k: int | list[int] = 3,
+        padding_mode: str = "zeros",
     ):
         super().__init__()
         self.patch_size = patch_size
@@ -33,7 +34,7 @@ class Downsampler(nn.Module):
             prev_ch = n_ch_out + n_ch_guidance if i > 0 else n_ch_in
             current_k = k if isinstance(k, int) else k[i]
 
-            downsample = Down(prev_ch, out_ch, current_k)
+            downsample = Down(prev_ch, out_ch, current_k, padding_mode=padding_mode)
             layers.append(downsample)
         self.downsample_layers = nn.ModuleList(layers)
 
@@ -69,12 +70,15 @@ class Upsampler(nn.Module):
         k: int | list[int] = 3,
         add_feats: bool = False,
         feat_weight: float = 0.3,
+        padding_mode: str = "zeros",
     ):
         super().__init__()
 
         self.patch_size = patch_size
-        self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
-        self.outp_conv = nn.Conv2d(n_ch_out, n_ch_out, 3, padding=1)
+        self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5, padding_mode=padding_mode)
+        self.outp_conv = nn.Conv2d(
+            n_ch_out, n_ch_out, 3, padding=1, padding_mode=padding_mode
+        )
         self.mlp = nn.Conv2d(n_ch_out, n_ch_out, 1)
 
         upsamples: list[nn.Module] = []
@@ -88,7 +92,9 @@ class Upsampler(nn.Module):
         for i in range(self.n_upsamples):
             current_k = k if isinstance(k, int) else k[i]
             in_ch = n_ch_in if i == 0 else chs[i - 1]
-            upsample = Up(in_ch + n_ch_downsample, chs[i], current_k)
+            upsample = Up(
+                in_ch + n_ch_downsample, chs[i], current_k, padding_mode=padding_mode
+            )
             upsamples.append(upsample)
         self.upsamples = nn.ModuleList(upsamples)
 
@@ -135,10 +141,13 @@ class Combined(nn.Module):
         k_down: int | list[int] = 3,
         k_up: int | list[int] = 3,
         feat_weight: float = -1,
+        padding_mode: str = "zeros",
     ):
         super().__init__()
 
-        self.downsampler = Downsampler(patch_size, n_ch_img, n_ch_downsample, k=k_down)
+        self.downsampler = Downsampler(
+            patch_size, n_ch_img, n_ch_downsample, k=k_down, padding_mode=padding_mode
+        )
         n_guidance_dims = n_ch_downsample + 3  # + self.downsampler.freq_dims
         add_feats = feat_weight > 0
         self.upsampler = Upsampler(
@@ -149,6 +158,7 @@ class Combined(nn.Module):
             k_up,
             add_feats=add_feats,
             feat_weight=feat_weight,
+            padding_mode=padding_mode,
         )
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
@@ -276,7 +286,13 @@ class Skips(nn.Module):
 
 class FeatureTransfer(nn.Module):
     def __init__(
-        self, n_ch_in: int = 384, n_ch_out: int = 128, k: int = 5, depth: int = 3
+        self,
+        n_ch_img: int = 3,
+        n_ch_in: int = 384,
+        n_ch_out: int = 128,
+        k: int = 5,
+        depth: int = 3,
+        padding_mode: str = "zeros",
     ):
         super().__init__()
         if n_ch_in != n_ch_out:
@@ -287,17 +303,18 @@ class FeatureTransfer(nn.Module):
         convs: list[nn.Module] = []
         for d in range(depth):
             in_ch = n_ch_in if d == 0 else chs[d - 1]
-            conv = DoubleConv(in_ch, chs[d], k=k)
+            conv = DoubleConv(in_ch + n_ch_img, chs[d], k=k)
             convs.append(conv)
         self.convs = nn.ModuleList(convs)
-        self.mlp = nn.Conv2d(chs[-1], chs[-1], 1)
+        self.mlp = nn.Conv2d(chs[-1] + n_ch_img, chs[-1], 1)
 
-    def forward(
-        self, _placeholder_arg: torch.Tensor, lr_feats: torch.Tensor
-    ) -> torch.Tensor:
-        x = lr_feats
+    def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
+        b, c, h, w = lr_feats.shape
+        img_lr = F.interpolate((h, w))
+        x = torch.cat((lr_feats, img_lr), dim=1)
         for layer in self.convs:
             x = layer(x)
+            x = torch.cat((lr_feats, img_lr), dim=1)
         x = self.mlp(x)
         return x
 

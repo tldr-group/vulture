@@ -8,7 +8,8 @@
         "n_ch_guidance": 3,
         "n_ch_downsampler": 64,
         "feat_weight": -1,
-        "patch_size": 14
+        "patch_size": 14,
+        "padding_mode": "zeros"
     },
     "transforms": {
         "flip_h_prob": 0.5,

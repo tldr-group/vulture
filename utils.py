@@ -52,6 +52,7 @@ class Experiment:
     n_ch_downsampler: int = 64
     feat_weight: float = -1
     patch_size: int = 14
+    padding_mode: Literal["zeros", "reflect", "replicate", "circular"] = "zeros"
 
     flip_h_prob: float = 0.5
     flip_v_prob: float = 0.5
