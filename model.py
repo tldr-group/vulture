@@ -295,6 +295,7 @@ class FeatureTransfer(nn.Module):
         padding_mode: str = "zeros",
     ):
         super().__init__()
+        self.n_ch_img = n_ch_img
         if n_ch_in != n_ch_out:
             chs = list(np.linspace(n_ch_in, n_ch_out, depth, dtype=np.int32))
         else:
@@ -303,18 +304,18 @@ class FeatureTransfer(nn.Module):
         convs: list[nn.Module] = []
         for d in range(depth):
             in_ch = n_ch_in if d == 0 else chs[d - 1]
-            conv = DoubleConv(in_ch + n_ch_img, chs[d], k=k)
+            conv = DoubleConv(in_ch + n_ch_img, chs[d], k=k, padding_mode=padding_mode)
             convs.append(conv)
         self.convs = nn.ModuleList(convs)
         self.mlp = nn.Conv2d(chs[-1] + n_ch_img, chs[-1], 1)
 
     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
         b, c, h, w = lr_feats.shape
-        img_lr = F.interpolate((h, w))
-        x = torch.cat((lr_feats, img_lr), dim=1)
+        img_lr = F.interpolate(img, (h, w))
+        x = torch.cat((lr_feats, img_lr), dim=1) if self.n_ch_img > 0 else lr_feats
         for layer in self.convs:
             x = layer(x)
-            x = torch.cat((lr_feats, img_lr), dim=1)
+            x = torch.cat((x, img_lr), dim=1) if self.n_ch_img > 0 else x
         x = self.mlp(x)
         return x
 

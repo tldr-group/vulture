@@ -118,6 +118,13 @@
     - maybe some form of image guidance is required (annoying as expensive)
     - still seems tough to learn the semantic mapping (spatial is fine though)
     - large kernel size + ciruclar padding might work well as can reproduce the padding effect of the jittering
+    - NB: should probs still norm image for transfer regardless of if not norming features
+    - img guidance in the transfer seems to cause a thinning of features - this might even be desirable were it not for the fact that the upsampling will probably work best with the lr features as they are (i.e slighly blurred) - may have to drop it if want 
+    - may need to include all that zoom/pad/flip info into the image, pass it through a learned downsampler and use that to guide the feature transfer
+        - in future this could all be part of the combined network? maybe with a loss term between the first levels of the input features and 
+    - seems like I can get away with just using 50 images in the lr feature generation - this is acceptable but for large images (2200, 2200) this takes 15s
+        - this is because featup learns to upsample via the 3000 images, and takes the first 50 to compute the lr feats for visualisation. why does the pca work then - features should be misaligned - i guess this is why the features are so different
+        - does this also point to a fundamental limit to your approach in that you don't have the info
 
 
 ## Model:

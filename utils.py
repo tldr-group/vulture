@@ -469,8 +469,11 @@ class JitteredImage(Dataset):
         )
 
 
-def get_lr_feats(model, img: torch.Tensor) -> torch.Tensor:
-    cfg_n_images = 3000
+def get_lr_feats(
+    model,
+    img: torch.Tensor,
+) -> torch.Tensor:
+    cfg_n_images = 50  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
     cfg_max_pad = 30

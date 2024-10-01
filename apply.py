@@ -33,7 +33,7 @@ Combined(
 """
 upsampler: Combined = upsampler.eval().to(DEVICE)
 
-path = "data/compare/81.png"
+path = "data/compare/80.png"
 
 # 500 ,375
 L = 224 * 2

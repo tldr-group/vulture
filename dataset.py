@@ -90,11 +90,12 @@ class EmbeddingDataset(Dataset):
             img_tensor = shift(img_tensor, shift_dist, shift_dir)
             hr_feats = shift(hr_feats, shift_dist, shift_dir)
 
+        img_tensor = img_tensor.to(torch.float32)
+        img_tensor = TF.normalize(
+            img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+        )
         if self.expr.norm:
-            img_tensor = img_tensor.to(torch.float32)
-            img_tensor = TF.normalize(
-                img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-            )
+
             lr_feats = F.normalize(lr_feats, p=1, dim=0)
             hr_feats = F.normalize(hr_feats, p=1, dim=0)
         return img_tensor, lr_feats, hr_feats
@@ -114,7 +115,7 @@ class EmbeddingDataset(Dataset):
 
         if self.expr.net_type != "transfer":
             lr_feats, hr_feats = (
-                embedding_data["dv2_lr_feats_reduced"][0],
+                embedding_data["lr_feats"][0],
                 embedding_data["hr_feats"][0],
             )
         else:

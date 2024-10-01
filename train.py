@@ -10,7 +10,7 @@ torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("configs/contract_transfer.json")
+expr = expriment_from_json("configs/combined_no_shift_feats.json")
 print(expr)
 
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", expr=expr, device=DEVICE)
@@ -23,13 +23,16 @@ val_dl = DataLoader(
     True,
 )
 
-# net = Combined(
-#     expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
-# ).to(DEVICE)
-
-net = FeatureTransfer(
-    k=expr.k, n_ch_in=expr.n_ch_in, padding_mode=expr.padding_mode
+net = Combined(
+    expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
 ).to(DEVICE)
+
+# net = FeatureTransfer(
+#     k=expr.k,
+#     n_ch_img=expr.n_ch_guidance,
+#     n_ch_in=expr.n_ch_in,
+#     padding_mode=expr.padding_mode,
+# ).to(DEVICE)
 init_weights(net, expr.weights_init)
 
 
