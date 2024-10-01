@@ -120,5 +120,5 @@ for i in range(N_EPOCHS):
         plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
 
         if val_loss < best_val_loss:
-            # todo: save net.state_dict() rather than net
+            # todo: actually update best val loss here lol
             torch.save(net.state_dict(), f"experiments/current/best.pth")

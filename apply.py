@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import normalize
 
+
 from utils import (
     to_numpy,
     do_2D_pca,
@@ -26,7 +27,7 @@ dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE).half()
 
 
-upsampler_weights = torch.load("apply_models/e410_no_shift.pth", weights_only=True)
+upsampler_weights = torch.load("apply_models/e490_no_shift.pth", weights_only=True)
 """
 Combined(
     14, n_ch_img=3, n_ch_in=128, n_ch_downsample=64, k_up=3, feat_weight=0.25
@@ -46,7 +47,7 @@ upsampler = Combined(
 upsampler.load_state_dict(upsampler_weights)
 upsampler = upsampler.eval().to(DEVICE)
 
-path = "data/compare/c3.jpg"
+path = "data/compare/joined_image_crop.png"
 
 # 500 ,375
 L = 224
@@ -84,16 +85,44 @@ if HALF:
 
 print(img.shape)
 original = original.convert("RGB")
-reduced_tensor = get_lr_feats(
-    dv2, img, 50
-)  # torch.tensor(reduced_np).permute((-1, 0, 1)).unsqueeze(0)
 
-data = torch.load("data/imagenet_reduced/val/0.pth")["lr_feats"]
 
+from time import time_ns
+
+torch.cuda.reset_peak_memory_stats(img.device)  # s.t memory is accurate
+torch.cuda.synchronize(img.device)  # s.t time is accurate
+
+
+def _to_MB(x: int) -> float:
+    return x / (1024**2)
+
+
+def _to_s(t: int) -> float:
+    return t / 1e9
+
+
+start_m = torch.cuda.max_memory_allocated(img.device)
+t0 = time_ns()
+
+reduced_tensor = get_lr_feats(dv2, img, 25)
+torch.cuda.synchronize(img.device)
+t1 = time_ns()
 
 reduced_tensor = reduced_tensor.to(DEVICE).to(torch.float32)
 reduced_tensor = F.normalize(reduced_tensor, p=1, dim=1)
 hr_feats = upsampler(inp_img, reduced_tensor)
+
+
+end_m = torch.cuda.max_memory_allocated(img.device)
+torch.cuda.synchronize(img.device)
+t2 = time_ns()
+print(
+    f"t_lr: {_to_s(t1 -t0)}s, t_up: {_to_s(t2-t1)}s, mem: {_to_MB(end_m - start_m)}MB"
+)
+
+# torch.tensor(reduced_np).permute((-1, 0, 1)).unsqueeze(0)
+
+
 hr_feats_np = to_numpy(hr_feats)
 # hr_feats_np = np.nan_to_num(hr_feats_np, nan=0)
 reduced_hr = do_2D_pca(hr_feats_np, 3, post_norm="minmax")

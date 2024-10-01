@@ -488,15 +488,12 @@ def get_lr_feats(model, img: torch.Tensor, n_imgs: int = 50) -> torch.Tensor:
         return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
 
     dataset = JitteredImage(img, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
-    loader = DataLoader(dataset, 64)
+    loader = DataLoader(dataset, cfg_pca_batch)
     with torch.no_grad():
-        transform_params = defaultdict(list)
         lr_feats = project(img)
 
         jit_features = []
-        for transformed_image, tp in tqdm(loader):
-            for k, v in tp.items():
-                transform_params[k].append(v)
+        for transformed_image, tp in loader:
             jit_features.append(project(transformed_image).cpu())
         jit_features = torch.cat(jit_features, dim=0)
         # transform_params = {k: torch.cat(v, dim=0) for k, v in transform_params.items()}
