@@ -111,10 +111,17 @@ class EmbeddingDataset(Dataset):
             weights_only=True,
         )
         # dataloader will batch for us
-        lr_feats, hr_feats = (
-            embedding_data["dv2_lr_feats_reduced"][0],
-            embedding_data["hr_feats"][0],
-        )
+
+        if self.expr.net_type != "transfer":
+            lr_feats, hr_feats = (
+                embedding_data["dv2_lr_feats_reduced"][0],
+                embedding_data["hr_feats"][0],
+            )
+        else:
+            lr_feats, hr_feats = (
+                embedding_data["dv2_lr_feats"][0],
+                embedding_data["lr_feats"][0],
+            )
 
         img = Image.open(
             f"{self.img_dir}/{chosen_fname_val % 10}/{chosen_fname_val}.png"
@@ -124,7 +131,9 @@ class EmbeddingDataset(Dataset):
 
 
 if __name__ == "__main__":
-    ds = EmbeddingDataset("data/imagenet_reduced", "val", Experiment("test"))
+    ds = EmbeddingDataset(
+        "data/imagenet_reduced", "val", Experiment("test", "transfer")
+    )
     dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)

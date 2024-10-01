@@ -76,6 +76,47 @@
         - w/out feature guidance
         - w/out pixel shifts in dataset (cause of blurring?)
 
+## Notes 30/09/24:
+- got  vanilla dv2 embeddings, fixed image for non 224 multiples
+- seems tough to do a contractive model with dv2 features w/out feature guidance in early layers
+    - val loss seems flat after after 120 epochs, train loss decreasing smoothly
+        - hoping for a step change after 200 epochs
+    - unsure if this is the contractiveness, or using the proper dv2 features or the lack of early guidance
+        - contractivenss = harder problem
+        - using dv2 lr features (and not featup lr features computed over batch of jitters) = harder problem - now a distribution drift as well
+        - lack of feature guidance: harder problem, now also needs to focus more on semantics
+        - could also maybe be a lack of pixel shifts? see that as unlikely though
+    - might be worth trying with lower lr?
+    - theoretically the resolution comes later in training once it's sorted the main bits, though worry is it's not really sorting the main bits
+    - could try not doing contractive and just going from dv2 128-dim pca
+    - could add another loss term that compares downsample to dv2 feats - although wrong n dim
+    - if it still sucks after 300 try with lower lr
+    - it seems like the previous approach w/ feat guidance and wrong feats learned semantics first then resolution
+    - what i see with no feat guidance and dv2 feats is kind of the other way round: get good res but features 'wrong colour' and am now seeing a gradual phase shift in feature color in my val set
+    - this mostly wasn't needed in the original bc the dist of the lr feats and hr feats seemed similar
+    - just had big spike in loss oh dear
+    - @epoch 200 seems like the val loss just fluctuates between 40-50k, despite the train loss decreasing. 
+        - might try the non-contractive model on pca 128 dinov2 data
+    - @ epoch 221: massive loss spike - lol, lmao even
+        - [220/5000]: train=938440.421875, val=51108.9609375
+        - [221/5000]: train=2697649.017578125, val=5022666.0
+        - [222/5000]: train=2961435.69921875, val=46635.546875
+        - ????????
+        - [223/5000]: train=2099878.984375, val=41993.75390625
+- is the fact that the input and output are now drawn from different dists actually quite a big problem? now needs to learn whatever mapping was done between the lr dv2 feats and the lr featup feats which are then upsampled. note that the featup feats involve different view of the features so has more info
+    - could try training a style transfer net from lr dv2 feats to lr featup feats: very small - two/three double convs?
+    - it really does seem like it's struggling between learning generic feature upsampling and learning to remap the feature spaces (or at least struggling to balance them)
+    - now means downsampler will have to learn some remapping I suppose (as well as upsampler ofc) - which isn't what we want
+- literally all of them have a nasty peak around 200 when trained with lr=1e-3. best run so far could recover, other didn't
+
+## Notes 1/10/24:
+- today:
+    - test training a feature transfer & contraction net (384 lr dv2 -> 128 featup lr). Does it need image info or will a double conv stack work?
+    - if feature trasnfer works, add it as (frozen) component in training and test previous approach (non-contractive, no pixel shuffle, no feature guidance, image guidance) 
+- feature transfer seems tougher than expected:
+    -  maybe l1 loss can help for sharpness
+    - maybe some form of image guidance is required (annoying as expensive)
+
 
 ## Model:
 

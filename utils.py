@@ -36,7 +36,7 @@ norm_dict = {
     "minmax": MinMaxScaler(feature_range=(0, 1), clip=True, copy=False),
     "std": StandardScaler(copy=False),
 }
-
+InitTypes = Literal["ones", "zeros", "xavier", "uniform", "default"]
 
 # ========================= TYPES =========================
 
@@ -44,7 +44,7 @@ norm_dict = {
 @dataclass
 class Experiment:
     name: str
-    net_type: Literal["combined", "simple", "skips"] = "combined"
+    net_type: Literal["combined", "simple", "skips", "transfer"] = "combined"
     k: int = 3
     n_ch_in: int = 384
     n_ch_out: int = 128
@@ -66,6 +66,7 @@ class Experiment:
     batch_size: int = 32
     n_epochs: int = 5000
     save_per: int = 10
+    weights_init: InitTypes = "default"
 
 
 def expriment_from_json(json_obj_or_path: dict | str) -> Experiment:
@@ -86,6 +87,21 @@ def expriment_from_json(json_obj_or_path: dict | str) -> Experiment:
 
 
 # ========================= UPGRADES =========================
+
+
+def init_weights(m: nn.Module, init: InitTypes):
+    if isinstance(m, nn.Linear):
+        if init == "unit":
+            torch.nn.init.constant_(m.weight, 1)
+        elif init == "zero":
+            torch.nn.init.constant_(m.weight, 0)
+        elif init == "xavier":
+            torch.nn.init.xavier_uniform(m.weight)
+            # m.bias.data.fill_(0.01)
+        else:
+            pass
+
+
 class Patch:
     @staticmethod
     def add_flash_attn() -> Callable:

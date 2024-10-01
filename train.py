@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 
 from dataset import EmbeddingDataset, DataLoader, unnorm
-from model import Combined, Simple, Skips
-from utils import visualise, plot_losses, expriment_from_json
+from model import Combined, Simple, Skips, FeatureTransfer
+from utils import visualise, plot_losses, expriment_from_json, init_weights
 
 
 torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("configs/combined_no_shift.json")
+expr = expriment_from_json("configs/contract_transfer.json")
 print(expr)
 
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", expr=expr, device=DEVICE)
@@ -23,9 +23,12 @@ val_dl = DataLoader(
     True,
 )
 
-net = Combined(
-    expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
-).to(DEVICE)
+# net = Combined(
+#     expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
+# ).to(DEVICE)
+
+net = FeatureTransfer(k=expr.k, n_ch_in=expr.n_ch_in).to(DEVICE)
+init_weights(net, expr.weights_init)
 
 
 opt_dict = {

@@ -274,6 +274,34 @@ class Skips(nn.Module):
         return x
 
 
+class FeatureTransfer(nn.Module):
+    def __init__(
+        self, n_ch_in: int = 384, n_ch_out: int = 128, k: int = 5, depth: int = 3
+    ):
+        super().__init__()
+        if n_ch_in != n_ch_out:
+            chs = list(np.linspace(n_ch_in, n_ch_out, depth, dtype=np.int32))
+        else:
+            chs = [n_ch_in for i in range(depth)]
+
+        convs: list[nn.Module] = []
+        for d in range(depth):
+            in_ch = n_ch_in if d == 0 else chs[d - 1]
+            conv = DoubleConv(in_ch, chs[d], k=k)
+            convs.append(conv)
+        self.convs = nn.ModuleList(convs)
+        self.mlp = nn.Conv2d(chs[-1], chs[-1], 1)
+
+    def forward(
+        self, _placeholder_arg: torch.Tensor, lr_feats: torch.Tensor
+    ) -> torch.Tensor:
+        x = lr_feats
+        for layer in self.convs:
+            x = layer(x)
+        x = self.mlp(x)
+        return x
+
+
 def test_benchmark():
     l = 1400
     test_down_str = f"""
