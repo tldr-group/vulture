@@ -125,6 +125,10 @@
     - seems like I can get away with just using 50 images in the lr feature generation - this is acceptable but for large images (2200, 2200) this takes 15s
         - this is because featup learns to upsample via the 3000 images, and takes the first 50 to compute the lr feats for visualisation. why does the pca work then - features should be misaligned - i guess this is why the features are so different
         - does this also point to a fundamental limit to your approach in that you don't have the info
+        - can test this by measuring similarity between vecotrs as n_imgs fed into the jittered image database changes: should be quite similar to dv2 at the start but then change (relatively) significantly.
+            - how can you prove that it's unlearnable though? or at least, tough to learn?
+    
+    - multi-resolution training probably needed to ensure sharp features at higher resolutions
 
 
 ## Model:

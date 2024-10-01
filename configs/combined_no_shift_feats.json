@@ -9,7 +9,7 @@
         "n_ch_downsampler": 64,
         "feat_weight": 0.25,
         "patch_size": 14,
-        "padding_mode": "default"
+        "padding_mode": "replicate"
     },
     "transforms": {
         "flip_h_prob": 0.5,
@@ -33,6 +33,7 @@
         "lr": 1e-3,
         "batch_size": 32,
         "n_epochs": 5000,
-        "save_per": 10
+        "save_per": 10,
+        "weights_init": "uniform"
     }
 }

@@ -15,6 +15,7 @@ from utils import (
     closest_crop,
     resize_crop,
     get_lr_feats,
+    Experiment,
 )
 from model import Combined
 
@@ -25,33 +26,45 @@ dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE).half()
 
 
-upsampler = torch.load("apply_models/e870.pth")
+upsampler_weights = torch.load("apply_models/e410_no_shift.pth", weights_only=True)
 """
 Combined(
     14, n_ch_img=3, n_ch_in=128, n_ch_downsample=64, k_up=3, feat_weight=0.25
 )
 """
-upsampler: Combined = upsampler.eval().to(DEVICE)
+# upsampler: Combined = upsampler.eval().to(DEVICE)
+upsampler = Combined(
+    14,
+    n_ch_img=3,
+    n_ch_in=128,
+    n_ch_out=128,
+    n_ch_downsample=64,
+    k_up=3,
+    feat_weight=0.25,
+    padding_mode="replicate",
+)
+upsampler.load_state_dict(upsampler_weights)
+upsampler = upsampler.eval().to(DEVICE)
 
-path = "data/compare/80.png"
+path = "data/compare/c3.jpg"
 
 # 500 ,375
-L = 224 * 2
-_img = Image.open(path).convert("RGB").resize((L, L))
+L = 224
+_img = Image.open(path).convert("RGB")  # .resize((L, L))
 _h, _w = _img.height, _img.width
-# tr = closest_crop(_h, _w)
-norm = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-tr = T.Compose(
-    [
-        T.Resize((L, L)),
-        T.CenterCrop((L, L)),
-        T.ToTensor(),
-        norm,
-    ]
-)
+tr = closest_crop(_h, _w)
+# norm = T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+# tr = T.Compose(
+#     [
+#         T.Resize((L, L)),
+#         T.CenterCrop((L, L)),
+#         T.ToTensor(),
+#         norm,
+#     ]
+# )
 
 
-img, original = load_image(path, tr)
+img, original = load_image(path, tr, to_half=True)
 
 inp_img = (
     TF.normalize(
@@ -67,13 +80,12 @@ _, _, h, w = img.shape
 
 HALF = True
 if HALF:
-    dv2 = dv2.half()
     img = img.half()
 
 print(img.shape)
 original = original.convert("RGB")
 reduced_tensor = get_lr_feats(
-    dv2, img
+    dv2, img, 50
 )  # torch.tensor(reduced_np).permute((-1, 0, 1)).unsqueeze(0)
 
 data = torch.load("data/imagenet_reduced/val/0.pth")["lr_feats"]
