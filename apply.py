@@ -27,7 +27,7 @@ dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE).half()
 
 
-upsampler_weights = torch.load("apply_models/e490_no_shift.pth", weights_only=True)
+upsampler_weights = torch.load("apply_models/e3000_no_shift.pth", weights_only=True)
 """
 Combined(
     14, n_ch_img=3, n_ch_in=128, n_ch_downsample=64, k_up=3, feat_weight=0.25
@@ -47,7 +47,7 @@ upsampler = Combined(
 upsampler.load_state_dict(upsampler_weights)
 upsampler = upsampler.eval().to(DEVICE)
 
-path = "data/compare/joined_image_crop.png"
+path = "data/compare/foam.jpg"
 
 # 500 ,375
 L = 224
@@ -101,23 +101,30 @@ def _to_s(t: int) -> float:
     return t / 1e9
 
 
-start_m = torch.cuda.max_memory_allocated(img.device)
+m0 = torch.cuda.max_memory_allocated(img.device)
 t0 = time_ns()
 
 reduced_tensor = get_lr_feats(dv2, img, 25)
 torch.cuda.synchronize(img.device)
 t1 = time_ns()
+m1 = torch.cuda.max_memory_allocated(img.device)
 
-reduced_tensor = reduced_tensor.to(DEVICE).to(torch.float32)
+torch.cuda.reset_peak_memory_stats(img.device)  # s.t memory is accurate
+
+m2 = torch.cuda.max_memory_allocated(img.device)
+reduced_tensor = reduced_tensor.to(DEVICE)
 reduced_tensor = F.normalize(reduced_tensor, p=1, dim=1)
-hr_feats = upsampler(inp_img, reduced_tensor)
+
+with torch.autocast("cuda", torch.float16):
+    hr_feats = upsampler(inp_img, reduced_tensor)
 
 
-end_m = torch.cuda.max_memory_allocated(img.device)
+m3 = torch.cuda.max_memory_allocated(img.device)
 torch.cuda.synchronize(img.device)
 t2 = time_ns()
+
 print(
-    f"t_lr: {_to_s(t1 -t0)}s, t_up: {_to_s(t2-t1)}s, mem: {_to_MB(end_m - start_m)}MB"
+    f"t_lr: {_to_s(t1 -t0)}s, t_up: {_to_s(t2-t1)}s, mem_lr: {_to_MB(m1 - m0):.3f}MB , mem_up: {_to_MB(m3 - m1):.3f}MB"
 )
 
 # torch.tensor(reduced_np).permute((-1, 0, 1)).unsqueeze(0)

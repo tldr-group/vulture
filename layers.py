@@ -165,6 +165,7 @@ class Down(nn.Module):
         padding_mode: str = "zeros",
     ):
         super().__init__()
+        # could also try just changing the stride the conv
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
             DoubleConv(in_channels, out_channels, k=k, padding_mode=padding_mode),

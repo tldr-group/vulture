@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from json import load as load_json
 
 from tqdm import tqdm
+import torch.autograd.profiler as profiler
 
 
 import warnings
@@ -494,7 +495,7 @@ def get_lr_feats(model, img: torch.Tensor, n_imgs: int = 50) -> torch.Tensor:
 
         jit_features = []
         for transformed_image, tp in loader:
-            jit_features.append(project(transformed_image).cpu())
+            jit_features.append(project(transformed_image))
         jit_features = torch.cat(jit_features, dim=0)
         # transform_params = {k: torch.cat(v, dim=0) for k, v in transform_params.items()}
 
@@ -541,8 +542,8 @@ def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=N
             tensor.permute(1, 0, 2, 3)
             .reshape(C, B * H * W)
             .permute(1, 0)
-            .detach()
-            .cpu()
+            # .detach()
+            # .cpu()
         )
 
     if len(image_feats_list) > 1 and fit_pca is None:
@@ -574,7 +575,9 @@ def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=N
         x_red -= x_red.min(dim=0, keepdim=True).values
         x_red /= x_red.max(dim=0, keepdim=True).values
         B, C, H, W = feats.shape
-        reduced_feats.append(x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2).to(device))
+        reduced_feats.append(
+            x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2)
+        )  # .to(device)
 
     return reduced_feats, fit_pca
 
@@ -653,3 +656,19 @@ def prep_image(t, subtract_min=True):
         t = t.unsqueeze(0)
 
     return t
+
+
+if __name__ == "__main__":
+    DEVICE = "cuda:0"
+    dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
+    dv2 = add_flash_attention(dv2)
+    dv2 = dv2.eval().to(DEVICE).half()
+    with profiler.profile(with_stack=True, profile_memory=True) as prof:
+        img = torch.zeros((1, 3, 518, 518)).half().to(DEVICE)
+        res = get_lr_feats(dv2, img, 25)
+
+    print(
+        prof.key_averages(group_by_stack_n=5).table(
+            sort_by="self_cpu_time_total", row_limit=5
+        )
+    )

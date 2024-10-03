@@ -130,6 +130,16 @@
     
     - multi-resolution training probably needed to ensure sharp features at higher resolutions
 
+## Notes 3/10/24:
+- good to test how n_jittered_images affects feature resolution and faithfulness
+- can I add a (weighted, say=0.1/0.2) loss term that compares the downsampled output features to the original LR feats?
+    - effectively a fidelity term. 
+    -This would encourage it learning to upsample features rather than reproduce the distribution of the (slightly different) HR featup dist (from 3000 jittered images) 
+- meeting with antony:
+    - try without feature guidance
+    - try with learned conv
+    - try with no max pooling just double stride
+- get minimum working hr feature setup on your laptop and see how long it takes!
 
 ## Model:
 
