@@ -16,7 +16,7 @@ dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
 # dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE)  # .half()
 
-with open("FeatUp/featup/configs/implicit_upsampler.yaml") as f:
+with open("FeatUp/featup/configs/implicit_upsampler_reg.yaml") as f:
     basic_conf_file = f.read()
 basic_conf = OmegaConf.create(basic_conf_file)
 
@@ -82,5 +82,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # so far have done 0 and 2
     # need to do 3, 4, 5, 6, 7, 8, 9
-    start_featup(args.n)
+    # can run this on a loop, make sure data config correct
+    for i in range(0, 10):
+        start_featup(i)
     # gen_original_dv2_embeds(dv2, "data")

@@ -1,5 +1,5 @@
 {
-    "name": "contractive_combined_no_shifts",
+    "name": "flat_combined_no_shifts_no_feats",
     "net": {
         "type": "combined",
         "k": 3,

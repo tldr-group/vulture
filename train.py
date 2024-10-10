@@ -16,7 +16,7 @@ torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("configs/combined_no_shift_feats.json")
+expr = expriment_from_json("configs/combined_no_shift.json")
 print(expr)
 
 train_ds = EmbeddingDataset("data/imagenet_reduced", "train", expr=expr, device=DEVICE)
@@ -120,5 +120,6 @@ for i in range(N_EPOCHS):
         plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
 
         if val_loss < best_val_loss:
-            # todo: actually update best val loss here lol
+            # todo: just save every 100 epochs?
             torch.save(net.state_dict(), f"experiments/current/best.pth")
+            best_val_loss = val_loss

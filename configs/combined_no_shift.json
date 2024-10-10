@@ -30,7 +30,7 @@
     "training": {
         "loss": "smooth_l1",
         "optim": "adamw",
-        "lr": 1e-3,
+        "lr": 1e-4,
         "batch_size": 32,
         "n_epochs": 5000,
         "save_per": 10
