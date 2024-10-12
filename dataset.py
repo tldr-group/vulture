@@ -33,11 +33,12 @@ class EmbeddingDataset(Dataset):
         expr: Experiment,
         using_splits: bool = True,
         device: str = "cuda:0",
+        data_suffix: Literal["", "_reg"] = "",
     ) -> None:
         super().__init__()
 
         self.root_dir = root_dir
-        self.subdir = "data" if which == "train" else which
+        self.subdir = "data" + data_suffix if which == "train" else which + data_suffix
         self.files = sorted(
             [
                 f"{root_dir}/{self.subdir}/{p}"

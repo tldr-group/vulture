@@ -470,7 +470,9 @@ class JitteredImage(Dataset):
         )
 
 
-def get_lr_feats(model, img: torch.Tensor, n_imgs: int = 50) -> torch.Tensor:
+def get_lr_feats(
+    model, img: torch.Tensor, n_imgs: int = 50, fit3d: bool = False
+) -> torch.Tensor:
     cfg_n_images = n_imgs  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
@@ -483,7 +485,10 @@ def get_lr_feats(model, img: torch.Tensor, n_imgs: int = 50) -> torch.Tensor:
 
         n_patch_w: int = 1 + (w - 14) // 14
         n_patch_h: int = 1 + (h - 14) // 14
-        feats = model.forward_features(x)["x_norm_patchtokens"]
+        if fit3d:
+            feats = model.forward_features(x)[:, 5:, :]
+        else:
+            feats = model.forward_features(x)["x_norm_patchtokens"]
         b, _, c = feats.shape
 
         return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))

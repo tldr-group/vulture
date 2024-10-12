@@ -141,6 +141,17 @@
     - try with no max pooling just double stride
 - get minimum working hr feature setup on your laptop and see how long it takes!
 
+
+## Notes 12/10/24:
+- don't need feat weight/to add in the original features
+- training at 1e-4 much more stable and get nicer results
+- dv2_reg_fit3D gives sharper features in featup with the same parameters
+    - worth making a proper fork of FeatUp at some point which includes these changes explicitly
+    - i.e to the featuriser and the config and the saving
+- also get lower val loss I think, which is nice
+- 
+
+
 ## Model:
 
 1) learned conv downsampler that takes image and iteratively downsamples, increasing channel depth. 
