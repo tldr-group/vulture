@@ -34,7 +34,7 @@ dv2 = dv2.eval().to(DEVICE).half()
 #     "apply_models/e4290_no_shift_no_feat_slow.pth", weights_only=True
 # )
 
-upsampler_weights = torch.load("apply_models/e1390_fit_reg.pth", weights_only=True)
+upsampler_weights = torch.load("apply_models/e5000_full_fit_reg.pth", weights_only=True)
 
 featup_jbu = torch.hub.load("mhamilton723/FeatUp", "dinov2", use_norm=True).to(DEVICE)
 """
@@ -56,7 +56,8 @@ upsampler = Combined(
 upsampler.load_state_dict(upsampler_weights)
 upsampler = upsampler.eval().to(DEVICE)
 
-path = "data/compare/ebc2.png"
+# path = "data/compare/bar.JPEG"
+path = "data/nz/accom.png"
 
 # 500 ,375
 L = 322 * 2  # 2 * 224
@@ -95,20 +96,20 @@ if HALF:
 print(img.shape)
 original = original.convert("RGB")
 
-torch.cuda.reset_peak_memory_stats(img.device)  # s.t memory is accurate
-m4 = torch.cuda.max_memory_allocated(img.device)
-with torch.autocast("cuda", torch.float16):
-    jbu_feats = featup_jbu(img.to(torch.float32))
-m5 = torch.cuda.max_memory_allocated(img.device)
-jbu_feats = F.interpolate(jbu_feats, (h, w))
-jbu_feats_np = to_numpy(jbu_feats)
-print(jbu_feats.shape)
+# torch.cuda.reset_peak_memory_stats(img.device)  # s.t memory is accurate
+# m4 = torch.cuda.max_memory_allocated(img.device)
+# with torch.autocast("cuda", torch.float16):
+#     jbu_feats = featup_jbu(img.to(torch.float32))
+# m5 = torch.cuda.max_memory_allocated(img.device)
+# jbu_feats = F.interpolate(jbu_feats, (h, w))
+# jbu_feats_np = to_numpy(jbu_feats)
+# print(jbu_feats.shape)
 
-reduced_jbu = do_2D_pca(jbu_feats_np, 3, post_norm="minmax")
-plt.imsave(
-    "test_jbu.png",
-    reduced_jbu,
-)
+# reduced_jbu = do_2D_pca(jbu_feats_np, 3, post_norm="minmax")
+# plt.imsave(
+#     "test_jbu.png",
+#     reduced_jbu,
+# )
 
 
 from time import time_ns
@@ -128,7 +129,7 @@ def _to_s(t: int) -> float:
 m0 = torch.cuda.max_memory_allocated(img.device)
 t0 = time_ns()
 
-reduced_tensor = get_lr_feats(dv2, img, 25, fit3d=True)
+reduced_tensor = get_lr_feats(dv2, img, 50, fit3d=True)
 torch.cuda.synchronize(img.device)
 t1 = time_ns()
 m1 = torch.cuda.max_memory_allocated(img.device)
@@ -163,9 +164,9 @@ m3 = torch.cuda.max_memory_allocated(img.device)
 torch.cuda.synchronize(img.device)
 t2 = time_ns()
 
-print(
-    f"t_lr: {_to_s(t1 -t0)}s, t_up: {_to_s(t2-t1)}s, mem_lr: {_to_MB(m1 - m0):.3f}MB , mem_up: {_to_MB(m3 - m1):.3f}MB, mem_jbu: {_to_MB(m5 - m4):.3f}MB"
-)
+# print(
+#     f"t_lr: {_to_s(t1 -t0)}s, t_up: {_to_s(t2-t1)}s, mem_lr: {_to_MB(m1 - m0):.3f}MB , mem_up: {_to_MB(m3 - m1):.3f}MB, mem_jbu: {_to_MB(m5 - m4):.3f}MB"
+# )
 
 # torch.tensor(reduced_np).permute((-1, 0, 1)).unsqueeze(0)
 
@@ -173,6 +174,8 @@ print(
 hr_feats_np = to_numpy(hr_feats)
 # hr_feats_np = np.nan_to_num(hr_feats_np, nan=0)
 reduced_hr = do_2D_pca(hr_feats_np, 3, post_norm="minmax")
+# reduced_hr = hr_feats_np[:3, :, :].transpose((1, 2, 0))
+print(hr_feats_np.shape)
 plt.imsave(
     "test.png",
     reduced_hr,

@@ -175,7 +175,8 @@ def do_pca(
     pca = PCA(n_components=n_components)
 
     train_proj = pca.fit_transform(train_data)
-    projection = pca.transform(arr)
+    # projection = pca.transform(arr)
+    projection = arr[:, :3]
 
     if post_norm != None:
         scaler: MinMaxScaler | StandardScaler = norm_dict[post_norm]

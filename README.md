@@ -149,7 +149,7 @@
     - worth making a proper fork of FeatUp at some point which includes these changes explicitly
     - i.e to the featuriser and the config and the saving
 - also get lower val loss I think, which is nice
-- 
+- can we PCA down to k dims (k < 128, k = 10 say), then do gaussian blurs with different sigmas (s=1, 2, 4, 8?) on the feature stack channelwise and generate s * k feature stack considering the local environment?
 
 
 ## Model:
