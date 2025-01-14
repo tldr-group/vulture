@@ -1,11 +1,11 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision.transforms import functional as TF
+from torchvision.transforms import functional as TF  # type: ignore
 from json import load
 import numpy as np
 from PIL import Image
 
-from yoeo.utils import Experiment, unnormalize, paired_frames_vis
+from yoeo.utils import Experiment, paired_frames_vis
 
 from typing import Literal
 
