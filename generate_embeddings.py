@@ -11,7 +11,7 @@ from utils import do_2D_pca, to_numpy, do_pca
 
 torch.manual_seed(1001)
 
-DEVICE = "cuda:0"
+DEVICE = "cuda:1"
 dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
 # dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE)  # .half()
@@ -47,7 +47,7 @@ def gen_original_dv2_embeds(model: torch.nn.Module, folder: str) -> None:
         img_fname = f"{data_path}/splits/{img_idx % 10}/{img_idx}.png"
         img = Image.open(img_fname).convert("RGB")
 
-        tensor: torch.Tensor = tr(img).unsqueeze(0).cuda()
+        tensor: torch.Tensor = tr(img).unsqueeze(0).cuda(DEVICE)
         b, _, h, w = tensor.shape
         nt_w: int = 1 + (w - 14) // 14
         nt_h: int = 1 + (h - 14) // 14

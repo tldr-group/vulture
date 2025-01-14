@@ -279,7 +279,7 @@ def convert_image(
     if to_half:
         tensor = tensor.to(torch.float16)
     if to_gpu:
-        tensor = tensor.to("cuda:0")
+        tensor = tensor.to("cuda:1")
     if batch:
         tensor = tensor.unsqueeze(0)
     return tensor
@@ -665,7 +665,7 @@ def prep_image(t, subtract_min=True):
 
 
 if __name__ == "__main__":
-    DEVICE = "cuda:0"
+    DEVICE = "cuda:1"
     dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
     dv2 = add_flash_attention(dv2)
     dv2 = dv2.eval().to(DEVICE).half()
