@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.preprocessing import normalize
 
 
-from utils import (
+from yoeo.utils import (
     to_numpy,
     do_2D_pca,
     add_flash_attention,
@@ -18,7 +18,7 @@ from utils import (
     get_lr_feats,
     Experiment,
 )
-from model import Combined
+from yoeo.models.model import Combined
 
 torch.backends.cudnn.enabled = True
 

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from layers import ImplicitFeaturizer, DoubleConv, Up, Down
 
 import torch.utils.benchmark as benchmark
-from utils import measure_mem_time
+from yoeo.utils import measure_mem_time
 
 torch.backends.cudnn.benchmark = False
 

@@ -8,7 +8,7 @@ np.random.seed(0)
 
 from dataset import EmbeddingDataset, DataLoader, unnorm
 from model import Combined, Simple, Skips, FeatureTransfer
-from utils import visualise, plot_losses, expriment_from_json, init_weights
+from yoeo.utils import visualise, plot_losses, expriment_from_json, init_weights
 
 
 torch.cuda.empty_cache()

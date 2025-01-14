@@ -6,7 +6,7 @@ from os import listdir
 from PIL import Image
 from typing import Literal
 
-from utils import visualise, Experiment
+from yoeo.utils import visualise, Experiment
 
 
 import warnings

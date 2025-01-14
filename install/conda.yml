@@ -1,0 +1,15 @@
+name: yeoe
+channels:
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  - pytorch>=2.0.0
+  - pytorch-cuda>=12.4.0
+  - torchvision
+  - torchmetrics>=0.10.3
+  - pip
+  - pip:
+    - ninja
+    - packaging

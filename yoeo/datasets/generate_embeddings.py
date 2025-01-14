@@ -7,14 +7,11 @@ from os import listdir
 from PIL import Image
 from featup.train_implicit_upsampler import my_app
 
-from utils import do_2D_pca, to_numpy, do_pca
+from yoeo.utils import do_2D_pca, to_numpy, do_pca
 
 torch.manual_seed(1001)
 
 DEVICE = "cuda:1"
-dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
-# dv2 = add_flash_attention(dv2)
-dv2 = dv2.eval().to(DEVICE)  # .half()
 
 with open("FeatUp/featup/configs/implicit_upsampler_reg.yaml") as f:
     basic_conf_file = f.read()
