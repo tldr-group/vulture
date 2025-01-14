@@ -222,7 +222,6 @@ class FeaturePropagator(nn.Module):
         self.downsampler = Downsampler(
             patch_size, n_ch_imgs, n_ch_downsample, k=k_down, padding_mode=padding_mode
         )
-        self.
 
 
 # class Skips(nn.Module):
