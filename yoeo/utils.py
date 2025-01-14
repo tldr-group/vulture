@@ -391,6 +391,31 @@ def visualise(
     plt.close()
 
 
+def paired_frames_vis(
+    imgs_0: torch.Tensor, imgs_1: torch.Tensor, out_path: str
+) -> None:
+    def _torch_to_np(x: torch.Tensor):
+        return unnormalize(x).numpy().transpose((0, 2, 3, 1)).astype(np.uint8)
+
+    vis_0, vis_1 = (
+        _torch_to_np(imgs_0),
+        _torch_to_np(imgs_1),
+    )
+    N = vis_1.shape[0]
+    fig, axs = plt.subplots(nrows=2, ncols=N)
+    fig.set_size_inches(4 * N, 4 * 2)
+
+    for i in range(N):
+        axs[0, i].imshow(vis_0[i])
+        axs[0, i].set_axis_off()
+        axs[1, i].imshow(vis_1[i])
+        axs[1, i].set_axis_off()
+
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
 def plot_losses(train_loss: list[float], val_loss: list[float], out_path: str) -> None:
     epochs = np.arange(len(train_loss))
     plt.semilogy(epochs, train_loss, lw=2, label="train")
