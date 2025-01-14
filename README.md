@@ -152,6 +152,11 @@
 - can we PCA down to k dims (k < 128, k = 10 say), then do gaussian blurs with different sigmas (s=1, 2, 4, 8?) on the feature stack channelwise and generate s * k feature stack considering the local environment?
 
 
+## Notes 14/01/25:
+- gen embeddings for dv2 with registers
+- reworked into module structure
+- started working on propagator
+
 ## Model:
 
 1) learned conv downsampler that takes image and iteratively downsamples, increasing channel depth. 

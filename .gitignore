@@ -167,4 +167,4 @@ sample-images/
 data/
 out/
 experiments/
-apply_models/
+trained_models/
