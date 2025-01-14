@@ -166,22 +166,20 @@ class Combined(nn.Module):
         return self.upsampler(lr_feats, downsamples)
 
 
-class Simple(nn.Module):
+class SimpleConv(nn.Module):
     def __init__(
         self,
         n_ch_out: int = 128,
+        n_ch_guidance: int = 64,
         n_convs: int = 8,
         k: int = 3,
         contractive: bool = True,
     ):
         super().__init__()
-        n_freqs = 10
-        n_guidance_dims = 3  # + n_freqs * 10
-        self.implict = ImplicitFeaturizer(True, n_freqs)
 
         if contractive:
             ch_vals = np.linspace(
-                n_guidance_dims + n_ch_out,
+                n_ch_guidance + n_ch_out,
                 n_ch_out,
                 n_convs + 1,
                 endpoint=True,
@@ -190,25 +188,41 @@ class Simple(nn.Module):
             ch_vals = [int(i) for i in ch_vals]
         else:
             ch_vals = [n_ch_out for i in range(n_convs + 1)]
-        print(ch_vals)
+
         self.in_conv = nn.Conv2d(
-            n_guidance_dims + n_ch_out, ch_vals[0], k, padding=floor(k / 2)
+            n_ch_guidance + n_ch_out, ch_vals[0], k, padding=floor(k / 2)
         )
         layers: list[nn.Module] = []
         for i in range(1, n_convs + 1):
             layers.append(DoubleConv(ch_vals[i - 1], ch_vals[i], k=k))
         self.layers = nn.ModuleList(layers)
 
-    def forward(self, x: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
-        _, _, h, w = x.shape
-        resized_feats = F.interpolate(lr_feats, (h, w))
-        # impl_feats = self.implict(x)
-        inp = torch.cat((x, resized_feats), dim=1)
-        x = self.in_conv(inp)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.in_conv(x)
         for l in self.layers:
             x = l(x)
-        x = F.normalize(x, p=1, dim=1)
+        # x = F.normalize(x, p=1, dim=1)
         return x
+
+
+class FeaturePropagator(nn.Module):
+    def __init__(
+        self,
+        patch_size: int,
+        n_ch_imgs: int = 6,
+        n_ch_in: int = 128,
+        n_ch_out: int = 128,
+        n_ch_downsample: int = 64,
+        k: int | list[int] = 3,
+        k_down: int | list[int] = 3,
+        padding_mode: str = "zeros",
+    ):
+        super().__init__()
+
+        self.downsampler = Downsampler(
+            patch_size, n_ch_imgs, n_ch_downsample, k=k_down, padding_mode=padding_mode
+        )
+        self.
 
 
 # class Skips(nn.Module):
