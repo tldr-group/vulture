@@ -211,113 +211,113 @@ class Simple(nn.Module):
         return x
 
 
-class Skips(nn.Module):
-    def __init__(
-        self,
-        patch_size: int,
-        n_freq_impl: int = 10,
-        n_ch_in: int = 128,
-        k_up: int | list[int] = 5,
-        lr_weight: float = 0.4,
-        learned: bool = False,
-    ):
-        super().__init__()
-        self.patch_size = patch_size
+# class Skips(nn.Module):
+#     def __init__(
+#         self,
+#         patch_size: int,
+#         n_freq_impl: int = 10,
+#         n_ch_in: int = 128,
+#         k_up: int | list[int] = 5,
+#         lr_weight: float = 0.4,
+#         learned: bool = False,
+#     ):
+#         super().__init__()
+#         self.patch_size = patch_size
 
-        self.lr_weight = lr_weight
-        self.implict = ImplicitFeaturizer(True, n_freq_impl, True)
-        n_ch_downsample = 3 + n_freq_impl * 10
+#         self.lr_weight = lr_weight
+#         self.implict = ImplicitFeaturizer(True, n_freq_impl, True)
+#         n_ch_downsample = 3 + n_freq_impl * 10
 
-        upsamples: list[nn.Module] = []
-        self.n_upsamples = ceil(log2(patch_size))
-        for i in range(self.n_upsamples):
-            current_k = k_up if isinstance(k_up, int) else k_up[i]
-            upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k, learned)
-            upsamples.append(upsample)
-        self.upsamples = nn.ModuleList(upsamples)
+#         upsamples: list[nn.Module] = []
+#         self.n_upsamples = ceil(log2(patch_size))
+#         for i in range(self.n_upsamples):
+#             current_k = k_up if isinstance(k_up, int) else k_up[i]
+#             upsample = Up(n_ch_in + n_ch_downsample, n_ch_in, current_k, learned)
+#             upsamples.append(upsample)
+#         self.upsamples = nn.ModuleList(upsamples)
 
-        # post_upsample_convs: list[nn.Module] = []
-        # for i in range(3):
-        #     post_upsample_convs.append(
-        #         DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, current_k)
-        #     )
-        # self.post_upsample_convs = nn.ModuleList(post_upsample_convs)
-        self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
-        self.conv = DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, k=current_k)
-        self.outp_conv = nn.Conv2d(n_ch_in, n_ch_in, 3, padding=1)
-        self.mlp = nn.Conv2d(n_ch_in, n_ch_in, 1)
+#         # post_upsample_convs: list[nn.Module] = []
+#         # for i in range(3):
+#         #     post_upsample_convs.append(
+#         #         DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, current_k)
+#         #     )
+#         # self.post_upsample_convs = nn.ModuleList(post_upsample_convs)
+#         self.inp_conv = DoubleConv(n_ch_in, n_ch_in, None, 5)
+#         self.conv = DoubleConv(n_ch_in + n_ch_downsample, n_ch_in, k=current_k)
+#         self.outp_conv = nn.Conv2d(n_ch_in, n_ch_in, 3, padding=1)
+#         self.mlp = nn.Conv2d(n_ch_in, n_ch_in, 1)
 
-    def _get_sizes(self, h: int, w: int, n_upsamples: int) -> list[tuple[int, int]]:
-        sizes: list[tuple[int, int]] = []
-        for i in range(n_upsamples + 1):
-            sizes.append((int(h / 2**i), int(w / 2**i)))
-        return sizes
+#     def _get_sizes(self, h: int, w: int, n_upsamples: int) -> list[tuple[int, int]]:
+#         sizes: list[tuple[int, int]] = []
+#         for i in range(n_upsamples + 1):
+#             sizes.append((int(h / 2**i), int(w / 2**i)))
+#         return sizes
 
-    def forward(self, img: torch.Tensor, lr_feats: torch.Tensor):
-        _, _, H, W = img.shape
-        impl = self.implict(img)
+#     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor):
+#         _, _, H, W = img.shape
+#         impl = self.implict(img)
 
-        sizes = self._get_sizes(H, W, self.n_upsamples)[::-1]
-        x_prev = F.interpolate(lr_feats, sizes[0])
-        for s, size in enumerate(sizes):
-            x_prev = F.interpolate(x_prev, size)
-            guidance = F.interpolate(impl, size)
-            resized_lr_feats = F.interpolate(lr_feats, size)
+#         sizes = self._get_sizes(H, W, self.n_upsamples)[::-1]
+#         x_prev = F.interpolate(lr_feats, sizes[0])
+#         for s, size in enumerate(sizes):
+#             x_prev = F.interpolate(x_prev, size)
+#             guidance = F.interpolate(impl, size)
+#             resized_lr_feats = F.interpolate(lr_feats, size)
 
-            if s < len(sizes) // 2:
-                lr_weight = self.lr_weight / (2 * (s + 1))
-                x_prev = ((1 - lr_weight) * x_prev) * (lr_weight * resized_lr_feats)
-            # x_prev = x_prev * resized_lr_feats
-            x_cat = torch.cat((x_prev, guidance), dim=1)
-            if s < len(sizes) - 1:
-                x_prev = self.upsamples[s](x_cat)
-            else:
-                x_prev = self.conv(x_cat)
+#             if s < len(sizes) // 2:
+#                 lr_weight = self.lr_weight / (2 * (s + 1))
+#                 x_prev = ((1 - lr_weight) * x_prev) * (lr_weight * resized_lr_feats)
+#             # x_prev = x_prev * resized_lr_feats
+#             x_cat = torch.cat((x_prev, guidance), dim=1)
+#             if s < len(sizes) - 1:
+#                 x_prev = self.upsamples[s](x_cat)
+#             else:
+#                 x_prev = self.conv(x_cat)
 
-        # for i in range(1, len(self.post_upsample_convs)):
-        #     x_prev = torch.cat((x_prev, guidance), dim=1)
-        #     x_prev = self.post_upsample_convs[i](x_prev)
+#         # for i in range(1, len(self.post_upsample_convs)):
+#         #     x_prev = torch.cat((x_prev, guidance), dim=1)
+#         #     x_prev = self.post_upsample_convs[i](x_prev)
 
-        x = self.outp_conv(x_prev)
-        x = self.mlp(x)
-        x = F.normalize(x, 1, dim=1)
-        return x
+#         x = self.outp_conv(x_prev)
+#         x = self.mlp(x)
+#         x = F.normalize(x, 1, dim=1)
+#         return x
 
 
-class FeatureTransfer(nn.Module):
-    def __init__(
-        self,
-        n_ch_img: int = 3,
-        n_ch_in: int = 384,
-        n_ch_out: int = 128,
-        k: int = 5,
-        depth: int = 3,
-        padding_mode: str = "zeros",
-    ):
-        super().__init__()
-        self.n_ch_img = n_ch_img
-        if n_ch_in != n_ch_out:
-            chs = list(np.linspace(n_ch_in, n_ch_out, depth, dtype=np.int32))
-        else:
-            chs = [n_ch_in for i in range(depth)]
+# class FeatureTransfer(nn.Module):
+#     def __init__(
+#         self,
+#         n_ch_img: int = 3,
+#         n_ch_in: int = 384,
+#         n_ch_out: int = 128,
+#         k: int = 5,
+#         depth: int = 3,
+#         padding_mode: str = "zeros",
+#     ):
+#         super().__init__()
+#         self.n_ch_img = n_ch_img
+#         if n_ch_in != n_ch_out:
+#             chs = list(np.linspace(n_ch_in, n_ch_out, depth, dtype=np.int32))
+#         else:
+#             chs = [n_ch_in for i in range(depth)]
 
-        convs: list[nn.Module] = []
-        for d in range(depth):
-            in_ch = n_ch_in if d == 0 else chs[d - 1]
-            conv = DoubleConv(in_ch + n_ch_img, chs[d], k=k, padding_mode=padding_mode)
-            convs.append(conv)
-        self.convs = nn.ModuleList(convs)
-        self.mlp = nn.Conv2d(chs[-1] + n_ch_img, chs[-1], 1)
+#         convs: list[nn.Module] = []
+#         for d in range(depth):
+#             in_ch = n_ch_in if d == 0 else chs[d - 1]
+#             conv = DoubleConv(in_ch + n_ch_img, chs[d], k=k, padding_mode=padding_mode)
+#             convs.append(conv)
+#         self.convs = nn.ModuleList(convs)
+#         self.mlp = nn.Conv2d(chs[-1] + n_ch_img, chs[-1], 1)
 
-    def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
-        b, c, h, w = lr_feats.shape
-        img_lr = F.interpolate(img, (h, w))
-        x = torch.cat((lr_feats, img_lr), dim=1) if self.n_ch_img > 0 else lr_feats
-        for layer in self.convs:
-            x = layer(x)
-            x = torch.cat((x, img_lr), dim=1) if self.n_ch_img > 0 else x
-        x = self.mlp(x)
-        return x
+#     def forward(self, img: torch.Tensor, lr_feats: torch.Tensor) -> torch.Tensor:
+#         b, c, h, w = lr_feats.shape
+#         img_lr = F.interpolate(img, (h, w))
+#         x = torch.cat((lr_feats, img_lr), dim=1) if self.n_ch_img > 0 else lr_feats
+#         for layer in self.convs:
+#             x = layer(x)
+#             x = torch.cat((x, img_lr), dim=1) if self.n_ch_img > 0 else x
+#         x = self.mlp(x)
+#         return x
 
 
 def test_benchmark():
