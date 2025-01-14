@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from math import floor
 
@@ -59,14 +58,7 @@ class Up(nn.Module):
     ):
         super().__init__()
         self.up: nn.Sequential | nn.ConvTranspose2d
-        """
-        if learned:
-            self.conv = DoubleConv(in_channels, in_channels, k=k)
-            self.up = nn.ConvTranspose2d(
-                in_channels, out_channels, kernel_size=2, stride=2
-            )
-        else:
-        """
+
         self.conv = DoubleConv(
             in_channels, out_channels, in_channels, k=k, padding_mode=padding_mode
         )
