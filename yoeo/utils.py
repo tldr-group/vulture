@@ -30,6 +30,8 @@ import torch.autograd.profiler as profiler
 
 import warnings
 
+# TODO: take featup stiff into its own file ('feature_prep.py') & pca + data stuf into its own file
+
 warnings.filterwarnings("ignore")
 
 NormType = Literal["minmax", "std", None]

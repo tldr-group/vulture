@@ -164,6 +164,7 @@ class FeatureUpsampler(nn.Module):
 class SimpleConv(nn.Module):
     def __init__(
         self,
+        n_ch_in: int = 128,
         n_ch_out: int = 128,
         n_ch_guidance: int = 64,
         n_convs: int = 8,
@@ -175,7 +176,7 @@ class SimpleConv(nn.Module):
         ch_vals: list[int] | np.ndarray
         if contractive:
             ch_vals = np.linspace(
-                n_ch_guidance + n_ch_out,
+                n_ch_guidance + n_ch_in,
                 n_ch_out,
                 n_convs + 1,
                 endpoint=True,
@@ -186,7 +187,7 @@ class SimpleConv(nn.Module):
             ch_vals = [n_ch_out for i in range(n_convs + 1)]
 
         self.in_conv = nn.Conv2d(
-            n_ch_guidance + n_ch_out, ch_vals[0], k, padding=floor(k / 2)
+            n_ch_guidance + n_ch_in, ch_vals[0], k, padding=floor(k / 2)
         )
         layers: list[nn.Module] = []
         for i in range(1, n_convs + 1):
@@ -211,13 +212,26 @@ class FeaturePropagator(nn.Module):
         n_ch_downsample: int = 64,
         k: int | list[int] = 3,
         k_down: int | list[int] = 3,
+        n_layers: int = 5,
         padding_mode: str = "zeros",
     ):
         super().__init__()
-
+        self.patch_size = patch_size
         self.downsampler = LearnedDownsampler(
             patch_size, n_ch_imgs, n_ch_downsample, k=k_down, padding_mode=padding_mode
         )
+        self.feature_adjuster = SimpleConv(
+            n_ch_in, n_ch_out, n_ch_downsample, n_layers, k, True
+        )
+
+    def forward(
+        self, f0: torch.Tensor, i0: torch.Tensor, i1: torch.Tensor
+    ) -> torch.Tensor:
+        combined_imgs = torch.cat((i0, i1), dim=1)  # (B, 2C, H, W)
+        guidance_from_image_features = self.downsampler.forward(combined_imgs)[0]
+        input_feats = torch.cat((f0, guidance_from_image_features), dim=1)
+        f1 = self.feature_adjuster.forward(input_feats)
+        return f1
 
 
 def test_benchmark():
