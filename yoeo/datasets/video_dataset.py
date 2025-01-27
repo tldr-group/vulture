@@ -79,13 +79,13 @@ class VideoDataset(Dataset):
 
     @torch.no_grad()
     def get_features_of_batches(
-        self, model: VisionTransformer, imgs_0: torch.Tensor, imgs_1: torch.Tensor
+        self, model: VisionTransformer, img_0: torch.Tensor, img_1: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         _, _, h, w = img_0.shape
         n_patch_h, n_patch_w = h // self.expr.patch_size, w // self.expr.patch_size
 
-        input_feat_dict: dict[str, torch.Tensor] = model.forward_features(imgs_0)  # type: ignore
-        target_feat_dict: dict[str, torch.Tensor] = model.forward_features(imgs_1)  # type: ignore
+        input_feat_dict: dict[str, torch.Tensor] = model.forward_features(img_0)  # type: ignore
+        target_feat_dict: dict[str, torch.Tensor] = model.forward_features(img_1)  # type: ignore
 
         flat_input_feats = input_feat_dict["x_norm_patchtokens"]
         flat_target_feats = target_feat_dict["x_norm_patchtokens"]
@@ -125,5 +125,5 @@ if __name__ == "__main__":
     n_samples = 8
     # paired_frames_vis(img_0[:n_samples], img_1[:n_samples], "out.png")
     propagator_batch_vis(
-        img_0, img_1, inp_feats, outp_feats, "prop_batch_vis.png", outp_feats
+        img_0, img_1, inp_feats, outp_feats, outp_feats, "prop_batch_vis.png"
     )

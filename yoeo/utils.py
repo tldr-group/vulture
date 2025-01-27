@@ -419,8 +419,8 @@ def propagator_batch_vis(
     imgs_1: torch.Tensor,
     feats_0: torch.Tensor,
     feats_1: torch.Tensor,
-    out_path: str,
     pred_feats: torch.Tensor | None,
+    out_path: str,
 ) -> None:
     n_rows = 5 if isinstance(pred_feats, torch.Tensor) else 4
     arrs = get_arrs_from_batch(imgs_0, feats_0, feats_1, pred_feats)
