@@ -6,7 +6,13 @@ from json import load
 import numpy as np
 from PIL import Image
 
-from yoeo.utils import Experiment, paired_frames_vis, expriment_from_json
+from yoeo.datasets.lr_hr_embedding_dataset import unnorm
+from yoeo.utils import (
+    Experiment,
+    paired_frames_vis,
+    propagator_batch_vis,
+    expriment_from_json,
+)
 
 from timm.models import VisionTransformer
 from typing import Literal
@@ -82,15 +88,18 @@ class VideoDataset(Dataset):
         target_feat_dict: dict[str, torch.Tensor] = model.forward_features(imgs_1)  # type: ignore
 
         flat_input_feats = input_feat_dict["x_norm_patchtokens"]
-        flat_target_feats = input_feat_dict["x_norm_patchtokens"]
-        b, n_t, c = flat_input_feats.shape
+        flat_target_feats = target_feat_dict["x_norm_patchtokens"]
+        b, _, c = flat_input_feats.shape
 
-        if self.expr.norm:
-            flat_input_feats = F.normalize(flat_input_feats, p=1, dim=1)
-            flat_target_feats = F.normalize(flat_input_feats, p=1, dim=1)
+        if self.expr.norm:  # normalize along channel dims
+            flat_input_feats = F.normalize(flat_input_feats, p=1, dim=-1)
+            flat_target_feats = F.normalize(flat_target_feats, p=1, dim=-1)
+        # we want features in shape (B,C,H,W) for network
+        flat_input_feats = flat_input_feats.permute((0, 2, 1))
+        flat_target_feats = flat_target_feats.permute((0, 2, 1))
 
-        input_feats = flat_input_feats.reshape((b, n_patch_h, n_patch_w, c))
-        target_feats = flat_target_feats.reshape((b, n_patch_h, n_patch_w, c))
+        input_feats = flat_input_feats.reshape((b, c, n_patch_h, n_patch_w))
+        target_feats = flat_target_feats.reshape((b, c, n_patch_h, n_patch_w))
 
         return (input_feats, target_feats)
 
@@ -109,10 +118,12 @@ if __name__ == "__main__":
     img_1 = img_1.to(DEVICE)
 
     inp_feats, outp_feats = ds.get_features_of_batches(dv2, img_0, img_1)
-    print(inp_feats.shape)
 
-    img_0 = img_0.to("cpu")
-    img_1 = img_1.to("cpu")
+    img_0 = unnorm(img_0.to("cpu")).to(torch.uint8)
+    img_1 = unnorm(img_1.to("cpu")).to(torch.uint8)
 
     n_samples = 8
-    paired_frames_vis(img_0[:n_samples], img_1[:n_samples], "out.png")
+    # paired_frames_vis(img_0[:n_samples], img_1[:n_samples], "out.png")
+    propagator_batch_vis(
+        img_0, img_1, inp_feats, outp_feats, "prop_batch_vis.png", outp_feats
+    )

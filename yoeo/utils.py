@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
-import torch.nn.functional as F
 from flash_attn import flash_attn_qkvpacked_func
 
 from timm.models.vision_transformer import VisionTransformer, Attention, Block  # type: ignore
@@ -19,12 +17,10 @@ import matplotlib.pyplot as plt
 
 from types import MethodType
 from typing import Callable, Literal
-from collections import defaultdict
 from dataclasses import dataclass, field
 
 from json import load as load_json
 
-from tqdm import tqdm
 import torch.autograd.profiler as profiler
 
 
@@ -413,6 +409,40 @@ def paired_frames_vis(
         axs[1, i].imshow(vis_1[i])
         axs[1, i].set_axis_off()
 
+    plt.tight_layout()
+    plt.savefig(out_path)
+    plt.close()
+
+
+def propagator_batch_vis(
+    imgs_0: torch.Tensor,
+    imgs_1: torch.Tensor,
+    feats_0: torch.Tensor,
+    feats_1: torch.Tensor,
+    out_path: str,
+    pred_feats: torch.Tensor | None,
+) -> None:
+    n_rows = 5 if isinstance(pred_feats, torch.Tensor) else 4
+    arrs = get_arrs_from_batch(imgs_0, feats_0, feats_1, pred_feats)
+
+    for i, sub_arr in enumerate(arrs):
+        img_tensor = imgs_1[i]
+        sub_arr.insert(2, to_numpy(img_tensor.permute((1, 2, 0))))
+
+    fig, axs = plt.subplots(nrows=n_rows, ncols=len(arrs))
+    fig.set_size_inches(
+        2 * len(arrs),
+        2 * n_rows,
+    )
+    for i, arr in enumerate(arrs):
+        for j, sub_arr in enumerate(arr):
+
+            if len(arrs) == 1:
+                axs[j].imshow(sub_arr)
+                axs[j].set_axis_off()
+            else:
+                axs[j, i].imshow(sub_arr)
+                axs[j, i].set_axis_off()
     plt.tight_layout()
     plt.savefig(out_path)
     plt.close()

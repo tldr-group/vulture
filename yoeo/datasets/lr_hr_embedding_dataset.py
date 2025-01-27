@@ -96,7 +96,6 @@ class EmbeddingDataset(Dataset):
             img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
         )
         if self.expr.norm:
-
             lr_feats = F.normalize(lr_feats, p=1, dim=0)
             hr_feats = F.normalize(hr_feats, p=1, dim=0)
         return img_tensor, lr_feats, hr_feats
@@ -134,7 +133,10 @@ class EmbeddingDataset(Dataset):
 
 if __name__ == "__main__":
     ds = EmbeddingDataset(
-        "data/imagenet_reduced", "val", Experiment("test", "transfer")
+        "data/imagenet_reduced",
+        "val",
+        Experiment("test"),
+        data_suffix="_reg",
     )
     dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
