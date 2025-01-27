@@ -143,7 +143,7 @@ class FeatureUpsampler(nn.Module):
         self.downsampler = LearnedDownsampler(
             patch_size, n_ch_img, n_ch_downsample, k=k_down, padding_mode=padding_mode
         )
-        n_guidance_dims = n_ch_downsample + 3
+        n_guidance_dims = n_ch_downsample + n_ch_img
         add_feats = feat_weight > 0
         self.upsampler = Upsampler(
             patch_size,
@@ -218,17 +218,22 @@ class FeaturePropagator(nn.Module):
         super().__init__()
         self.patch_size = patch_size
         self.downsampler = LearnedDownsampler(
-            patch_size, n_ch_imgs, n_ch_downsample, k=k_down, padding_mode=padding_mode
+            patch_size,
+            n_ch_imgs,
+            n_ch_downsample,
+            n_ch_guidance=n_ch_imgs,
+            k=k_down,
+            padding_mode=padding_mode,
         )
         self.feature_adjuster = SimpleConv(
-            n_ch_in, n_ch_out, n_ch_downsample, n_layers, k, True
+            n_ch_in, n_ch_out, n_ch_downsample + n_ch_imgs, n_layers, k, True
         )
 
     def forward(
         self, f0: torch.Tensor, i0: torch.Tensor, i1: torch.Tensor
     ) -> torch.Tensor:
         combined_imgs = torch.cat((i0, i1), dim=1)  # (B, 2C, H, W)
-        guidance_from_image_features = self.downsampler.forward(combined_imgs)[0]
+        guidance_from_image_features = self.downsampler.forward(combined_imgs)[-1]
         input_feats = torch.cat((f0, guidance_from_image_features), dim=1)
         f1 = self.feature_adjuster.forward(input_feats)
         return f1
