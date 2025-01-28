@@ -2,9 +2,10 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torchvision.transforms import functional as TF  # type: ignore
-from json import load
 import numpy as np
+from scipy.stats import truncnorm
 from PIL import Image
+from os import listdir
 
 from yoeo.datasets.lr_hr_embedding_dataset import unnorm
 from yoeo.utils import (
@@ -12,60 +13,75 @@ from yoeo.utils import (
     paired_frames_vis,
     propagator_batch_vis,
     expriment_from_json,
+    get_shortest_side_resize_dims,
+    resize_crop,
 )
 
 from timm.models import VisionTransformer
 from typing import Literal
+
+Datasets = Literal["lvos", "mose"]
+Splits = Literal["train", "val"]
+
+MIN_L = 518
 
 
 class VideoDataset(Dataset):
     def __init__(
         self,
         root_dir: str,
-        which: Literal["train", "val"],
+        datasets: list[Datasets],
+        which: Literal[Splits],
         expr: Experiment,
     ) -> None:
         super().__init__()
 
         self.root_dir = root_dir
+        self.datasets = datasets
         self.subdir = which
         self.expr = expr
 
-        json = self.get_meta_json()
-        self.map: dict[str, list[str]] = self.get_map_from_json(json)
+        self.map = self.get_map(self.root_dir, self.datasets, self.subdir)
         self.folder_names = list(self.map.keys())
         self.n = len(self.folder_names)
+        print(f"{self.n} files for '{self.subdir}' for {self.datasets}")
 
-        self.max_frame_dists = [5, 10, 10, 10, 20, 20, 20, 40, 40, 40, 60, 60, 60, 80]
+    def _get_files_or_folders_at_path(
+        self, root: str, ds: Datasets, split: Splits, vid_name: str | None
+    ) -> list[str]:
+        if vid_name is not None:
+            all_files = listdir(f"{root}/{ds}/{split}/JPEGImages/{vid_name}")
+        else:
+            all_files = listdir(f"{root}/{ds}/{split}/JPEGImages")
+        filtered = [
+            f for f in all_files if f[0] != "."
+        ]  # mose has duplicate/checksum folders/files with ._ prefixs
+        return filtered
 
-    def get_meta_json(self) -> dict:
-        with open(f"{self.root_dir}/{self.subdir}/meta.json") as f:
-            json = load(f)
-        return json["videos"]  # file json nested under 'json'
+    def get_map(
+        self, root: str, datasets: list[Datasets], split: Splits
+    ) -> dict[str, list[str]]:
+        out: dict[str, list[str]] = {}
+        for ds in datasets:
+            folders = self._get_files_or_folders_at_path(root, ds, split, None)
+            for folder in folders:
+                files = self._get_files_or_folders_at_path(root, ds, split, folder)
+                out[f"{root}/{ds}/{split}/JPEGImages/{folder}"] = files
+        return out
 
-    def get_map_from_json(self, json: dict) -> dict[str, list[str]]:
-        # go from json -> dict of fnames <-> frames in that fname
-        out_map: dict[str, list[str]] = {}
-        for video_folder, child_dict in json.items():
-            frame_range = child_dict["objects"]["1"]["frame_range"]
-            # frames aren't 000001, 000002 etc but are 00001, 00006, 00011 etc.
-            start = int(frame_range["start"])
-            end = int(frame_range["end"])
-            N = int(frame_range["frame_nums"])
-            inc = int((end - start) / N)
-            frames = [f"{(start + i * inc):08d}" for i in range(N)]
-            out_map[video_folder] = frames
-        return out_map
-
-    def _get_frames_in_window(self, max_dist: int, frames: list[str]) -> list[str]:
+    def _get_frames(self, frames: list[str]) -> list[str]:
         inds = np.arange(len(frames))
+        N = len(inds)
         first_frame_idx = np.random.choice(inds)
 
-        dist = np.random.randint(-max_dist, max_dist)
-        second_frame_idx = np.clip(dist + first_frame_idx, 0, inds[-1])
-
-        chosen_frames = [frames[int(first_frame_idx)], frames[int(second_frame_idx)]]
-        return chosen_frames
+        loc = first_frame_idx / float(N)
+        scale = 0.1
+        a_trunc, b_trunc = 0, 1
+        a, b = (a_trunc - loc) / scale, (b_trunc - loc) / scale
+        rv = truncnorm(a, b, loc=loc, scale=scale)
+        r = rv.rvs(size=1)
+        second_frame_idx = int(np.floor(r * (N - 1)))
+        return [frames[first_frame_idx], frames[second_frame_idx]]
 
     def _get_dir(self, folder: str, frame: str) -> str:
         return f"{self.root_dir}/{self.subdir}/JPEGImages/{folder}/{frame}.jpg"
@@ -76,17 +92,16 @@ class VideoDataset(Dataset):
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         folder = self.folder_names[index]
         frames = self.map[folder]
-        max_dist = np.random.choice(self.max_frame_dists)
-        chosen_frames = self._get_frames_in_window(
-            max_dist, frames
-        )  # list(np.random.choice(frames, 2, replace=False))
+        chosen_frames = self._get_frames(frames)
 
         imgs: list[torch.Tensor] = []
         for i in range(2):
-            pil = Image.open(self._get_dir(folder, chosen_frames[i]))
+            pil = Image.open(f"{folder}/{chosen_frames[i]}")
             tensor = TF.pil_to_tensor(pil)
             tensor = tensor.to(torch.float32)
-            cropped = TF.center_crop(tensor, [518, 518])
+            h, w = get_shortest_side_resize_dims(pil.height, pil.width, MIN_L)
+            resized = TF.resize(tensor, [h, w])
+            cropped = TF.center_crop(resized, [518, 518])
             normed = TF.normalize(cropped, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             imgs.append(normed)
         imgs_0, imgs_1 = imgs
@@ -126,7 +141,7 @@ if __name__ == "__main__":
     dv2 = dv2.eval().to(DEVICE)
 
     expr = expriment_from_json("yoeo/models/configs/simple_no_trs_dv2.json")
-    ds = VideoDataset("data/lvos", "train", expr)
+    ds = VideoDataset("data", ["lvos", "mose"], "train", expr)
     dl = DataLoader(ds, 20, True)
     img_0, img_1 = next(iter(dl))
     img_0 = img_0.to(DEVICE)

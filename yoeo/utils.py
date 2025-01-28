@@ -239,6 +239,13 @@ def closest_crop(
     return transform
 
 
+def get_shortest_side_resize_dims(
+    img_h: int, img_w: int, min_l: int
+) -> tuple[int, int]:
+    sf = min(img_w / min_l, img_h / min_l)
+    return (int(img_h * sf), int(img_w * sf))
+
+
 def resize_crop(
     resize_dims: tuple[int, int], crop_dims: tuple[int, int]
 ) -> transforms.Compose:
@@ -354,8 +361,10 @@ def get_arrs_from_batch(
 
             n_c, h, w = feat_arr.shape
             data_flat = feat_arr.reshape((n_c, h * w)).T
-            out = pca.fit_transform(data_flat)
-            out_rescaled = MinMaxScaler().fit_transform(out)
+            data_in = StandardScaler().fit_transform(data_flat)
+            out = pca.fit_transform(data_in)
+            out_rescaled = MinMaxScaler(clip=True).fit_transform(out)
+            # out_rescaled = np.clip(out_rescaled, 0, 1)
 
             out_2D = out_rescaled.reshape((h, w, k))
             out_2D_arrs.append(out_2D)
