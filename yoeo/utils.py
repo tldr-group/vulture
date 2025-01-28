@@ -242,7 +242,10 @@ def closest_crop(
 def get_shortest_side_resize_dims(
     img_h: int, img_w: int, min_l: int
 ) -> tuple[int, int]:
-    sf = min(img_w / min_l, img_h / min_l)
+    if min(img_w, img_h) > min_l:
+        sf = min(img_w / min_l, img_h / min_l)
+    else:
+        sf = max(min_l / img_w, min_l / img_h)
     return (int(img_h * sf), int(img_w * sf))
 
 
