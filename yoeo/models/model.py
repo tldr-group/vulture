@@ -167,9 +167,10 @@ class SimpleConv(nn.Module):
         n_ch_in: int = 128,
         n_ch_out: int = 128,
         n_ch_guidance: int = 64,
-        n_convs: int = 8,
+        n_convs: int = 4,
         k: int = 3,
         contractive: bool = True,
+        padding_mode: str = "zeros",
     ):
         super().__init__()
 
@@ -194,11 +195,17 @@ class SimpleConv(nn.Module):
             layers.append(DoubleConv(ch_vals[i - 1], ch_vals[i], k=k))
         self.layers = nn.ModuleList(layers)
 
+        self.outp_conv = nn.Conv2d(
+            n_ch_out, n_ch_out, 3, padding=1, padding_mode=padding_mode
+        )
+        self.mlp = nn.Conv2d(n_ch_out, n_ch_out, 1)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.in_conv(x)
         for l in self.layers:
             x = l(x)
-        # x = F.normalize(x, p=1, dim=1)
+        x = self.outp_conv(x)  # no LRELU
+        x = self.mlp(x)
         return x
 
 
@@ -226,7 +233,13 @@ class FeaturePropagator(nn.Module):
             padding_mode=padding_mode,
         )
         self.feature_adjuster = SimpleConv(
-            n_ch_in, n_ch_out, n_ch_downsample + n_ch_imgs, n_layers, k, True
+            n_ch_in,
+            n_ch_out,
+            n_ch_downsample + n_ch_imgs,
+            n_layers,
+            k,
+            True,
+            padding_mode=padding_mode,
         )
 
     def forward(
