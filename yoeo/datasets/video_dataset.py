@@ -75,7 +75,7 @@ class VideoDataset(Dataset):
         first_frame_idx = np.random.choice(inds)
 
         loc = first_frame_idx / float(N)
-        scale = 0.1
+        scale = 0.05
         a_trunc, b_trunc = 0, 1
         a, b = (a_trunc - loc) / scale, (b_trunc - loc) / scale
         rv = truncnorm(a, b, loc=loc, scale=scale)

@@ -30,10 +30,10 @@ dv2.eval().to(DEVICE)
 expr = expriment_from_json("yoeo/models/configs/simple_no_trs_dv2.json")
 print(expr)
 
-train_ds = VideoDataset("data/lvos", "train", expr=expr)
+train_ds = VideoDataset("data", ["lvos", "mose"], "train", expr=expr)
 train_dl = DataLoader(train_ds, expr.batch_size, True)
 
-val_ds = VideoDataset("data/lvos", "val", expr=expr)
+val_ds = VideoDataset("data", ["lvos", "mose"], "val", expr=expr)
 val_dl = DataLoader(train_ds, expr.batch_size, True)
 
 net = FeaturePropagator(
