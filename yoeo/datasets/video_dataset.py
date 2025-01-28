@@ -36,6 +36,8 @@ class VideoDataset(Dataset):
         self.folder_names = list(self.map.keys())
         self.n = len(self.folder_names)
 
+        self.max_frame_dists = [5, 10, 10, 10, 20, 20, 20, 40, 40, 40, 60, 60, 60, 80]
+
     def get_meta_json(self) -> dict:
         with open(f"{self.root_dir}/{self.subdir}/meta.json") as f:
             json = load(f)
@@ -55,6 +57,16 @@ class VideoDataset(Dataset):
             out_map[video_folder] = frames
         return out_map
 
+    def _get_frames_in_window(self, max_dist: int, frames: list[str]) -> list[str]:
+        inds = np.arange(len(frames))
+        first_frame_idx = np.random.choice(inds)
+
+        dist = np.random.randint(-max_dist, max_dist)
+        second_frame_idx = np.clip(dist + first_frame_idx, 0, inds[-1])
+
+        chosen_frames = [frames[int(first_frame_idx)], frames[int(second_frame_idx)]]
+        return chosen_frames
+
     def _get_dir(self, folder: str, frame: str) -> str:
         return f"{self.root_dir}/{self.subdir}/JPEGImages/{folder}/{frame}.jpg"
 
@@ -64,7 +76,10 @@ class VideoDataset(Dataset):
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         folder = self.folder_names[index]
         frames = self.map[folder]
-        chosen_frames = list(np.random.choice(frames, 2, replace=False))
+        max_dist = np.random.choice(self.max_frame_dists)
+        chosen_frames = self._get_frames_in_window(
+            max_dist, frames
+        )  # list(np.random.choice(frames, 2, replace=False))
 
         imgs: list[torch.Tensor] = []
         for i in range(2):
