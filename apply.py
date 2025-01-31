@@ -4,6 +4,7 @@ from torchvision.transforms import functional as TF
 from PIL import Image
 import matplotlib.pyplot as plt
 from time import time_ns
+from sklearn.preprocessing import MinMaxScaler
 
 
 from yoeo.utils import (
@@ -11,9 +12,9 @@ from yoeo.utils import (
     add_flash_attention,
     load_image,
     closest_crop,
-    get_lr_feats,
     Experiment,
 )
+from yoeo.feature_prep import get_lr_feats
 from yoeo.models.model import FeatureUpsampler
 
 torch.backends.cudnn.enabled = True
@@ -48,7 +49,7 @@ upsampler = FeatureUpsampler(
 upsampler.load_state_dict(upsampler_weights)
 upsampler = upsampler.eval().to(DEVICE)
 
-path = "data/compare/0.png"
+path = "data/compare/white_square_small.png"
 
 L = 322 * 2  # 2 * 224
 _img = Image.open(path).convert("RGB")  # .resize((L, L))
@@ -111,7 +112,11 @@ torch.cuda.synchronize(img.device)
 t2 = time_ns()
 
 hr_feats_np = to_numpy(hr_feats)
-reduced_hr = hr_feats_np[:3].transpose((1, 2, 0))
+reduced_hr = hr_feats_np[:3]
+c, h, w = reduced_hr.shape
+reduced_hr_flat = reduced_hr.reshape((c, h * w)).T
+reduced_hr_rescaled = MinMaxScaler(clip=True).fit_transform(reduced_hr_flat)
+reduced_hr = reduced_hr_rescaled.reshape((h, w, c))
 plt.imsave(
     "test.png",
     reduced_hr,

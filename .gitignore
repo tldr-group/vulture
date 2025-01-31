@@ -168,3 +168,5 @@ data/
 out/
 experiments/
 trained_models/
+
+test.png

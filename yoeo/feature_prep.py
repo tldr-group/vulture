@@ -8,7 +8,7 @@ import random
 from sklearn.decomposition import PCA
 
 """
-This code is loosely adapted from FeatUp [1, 2], whose high-res implict features I use as a training target
+This code is loosely adapted/directly taken from FeatUp [1, 2], whose high-res implict features I use as a training target
 for my upsampler. When training their implict upsampler per-image they prepare a dataset of features (from, say, DINO) of
 'jitters'=transforms of the original input image, then compute and apply a shared PCA over these jittered features. This is part
 of their NeRF analogy - "that multiview consistency of low-resolution signals can supervise the construction of 
@@ -38,9 +38,9 @@ the propagator to quickly extract the LR-features so they can be input into the 
 
 
 [1] https://github.com/mhamilton723/FeatUp
-[2] Fu et al, 'FeatUp: A Model-Agnostic Framework for Features at Any Resolution', https://arxiv.org/abs/2403.10516
+[2] Fu, S. et al, 'FeatUp: A Model-Agnostic Framework for Features at Any Resolution', https://arxiv.org/abs/2403.10516
 [3] https://github.com/Dao-AILab/flash-attention
-[4] Dao, 'FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning', https://tridao.me/publications/flash2/flash2.pdf
+[4] Dao, T., 'FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning', https://tridao.me/publications/flash2/flash2.pdf
 """
 
 
