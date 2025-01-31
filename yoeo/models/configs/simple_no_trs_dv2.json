@@ -20,10 +20,9 @@
         "norm": true
     },
     "training": {
-        "weights_init": "unit",
         "loss": "smooth_l1",
         "optim": "adamw",
-        "lr": 5e-4,
+        "lr": 1e-4,
         "batch_size": 32,
         "n_epochs": 5000,
         "save_per": 10
