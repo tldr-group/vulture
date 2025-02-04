@@ -338,6 +338,7 @@ def get_arrs_from_batch(
     lr_feats: torch.Tensor,
     hr_feats: torch.Tensor,
     pred_hr_feats: torch.Tensor | None,
+    featup_feats: bool = False,
 ) -> list[list[np.ndarray]]:
     b, c, h, w = hr_feats.shape
 
@@ -364,8 +365,13 @@ def get_arrs_from_batch(
 
             n_c, h, w = feat_arr.shape
             data_flat = feat_arr.reshape((n_c, h * w)).T
-            data_in = StandardScaler().fit_transform(data_flat)
-            out = pca.fit_transform(data_in)
+
+            if featup_feats:
+                data_flat = data_flat[:, :k]
+                out = data_flat
+            else:
+                data_in = StandardScaler().fit_transform(data_flat)
+                out = pca.fit_transform(data_in)
             out_rescaled = MinMaxScaler(clip=True).fit_transform(out)
             # out_rescaled = np.clip(out_rescaled, 0, 1)
 
@@ -433,9 +439,10 @@ def propagator_batch_vis(
     feats_1: torch.Tensor,
     pred_feats: torch.Tensor | None,
     out_path: str,
+    featup_feats: bool = False,
 ) -> None:
     n_rows = 5 if isinstance(pred_feats, torch.Tensor) else 4
-    arrs = get_arrs_from_batch(imgs_0, feats_0, feats_1, pred_feats)
+    arrs = get_arrs_from_batch(imgs_0, feats_0, feats_1, pred_feats, featup_feats)
 
     for i, sub_arr in enumerate(arrs):
         img_tensor = imgs_1[i]
