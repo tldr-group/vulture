@@ -16,6 +16,7 @@ from yoeo.utils import (
     get_shortest_side_resize_dims,
     resize_crop,
 )
+from yoeo.feature_prep import get_lr_feats, project
 
 from timm.models import VisionTransformer
 from typing import Literal
@@ -101,7 +102,7 @@ class VideoDataset(Dataset):
             tensor = tensor.to(torch.float32)
             h, w = get_shortest_side_resize_dims(pil.height, pil.width, MIN_L)
             resized = TF.resize(tensor, [h, w])
-            cropped = TF.center_crop(resized, [518, 518])
+            cropped = TF.center_crop(resized, [MIN_L, MIN_L])
             normed = TF.normalize(cropped, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             imgs.append(normed)
         imgs_0, imgs_1 = imgs
@@ -109,21 +110,33 @@ class VideoDataset(Dataset):
 
     @torch.no_grad()
     def get_features_of_batches(
-        self, model: VisionTransformer, img_0: torch.Tensor, img_1: torch.Tensor
+        self,
+        model: VisionTransformer,
+        img_0: torch.Tensor,
+        img_1: torch.Tensor,
+        to_half_for_proj: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         _, _, h, w = img_0.shape
         n_patch_h, n_patch_w = h // self.expr.patch_size, w // self.expr.patch_size
+
+        if to_half_for_proj:
+            img_0, img_1 = img_0.to(torch.half), img_1.to(torch.half)
 
         input_feat_dict: dict[str, torch.Tensor] = model.forward_features(img_0)  # type: ignore
         target_feat_dict: dict[str, torch.Tensor] = model.forward_features(img_1)  # type: ignore
 
         flat_input_feats = input_feat_dict["x_norm_patchtokens"]
         flat_target_feats = target_feat_dict["x_norm_patchtokens"]
+
+        if to_half_for_proj:
+            flat_input_feats = flat_input_feats.to(torch.float)
+            flat_target_feats = flat_target_feats.to(torch.float)
+
         b, _, c = flat_input_feats.shape
 
         if self.expr.norm:  # normalize along channel dims
-            flat_input_feats = F.normalize(flat_input_feats, p=1, dim=-1)
-            flat_target_feats = F.normalize(flat_target_feats, p=1, dim=-1)
+            flat_input_feats = F.normalize(flat_input_feats, p=1, dim=0)
+            flat_target_feats = F.normalize(flat_target_feats, p=1, dim=0)
         # we want features in shape (B,C,H,W) for network
         flat_input_feats = flat_input_feats.permute((0, 2, 1))
         flat_target_feats = flat_target_feats.permute((0, 2, 1))
@@ -132,6 +145,44 @@ class VideoDataset(Dataset):
         target_feats = flat_target_feats.reshape((b, c, n_patch_h, n_patch_w))
 
         return (input_feats, target_feats)
+
+    def get_featup_features_of_batches(
+        self,
+        model: VisionTransformer,
+        img_0: torch.Tensor,
+        img_1: torch.Tensor,
+        to_half_for_proj: bool = True,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        b, _, h, w = img_0.shape
+
+        if to_half_for_proj:
+            img_0, img_1 = img_0.to(torch.half), img_1.to(torch.half)
+
+        inp_featup_feats_li, outp_featup_feats_li = [], []
+        for idx in range(b):
+            img_0_i, img_1_i = img_0[idx].unsqueeze(0), img_1[idx].unsqueeze(0)
+
+            input_feats_i, pca_i = get_lr_feats(model, img_0_i, 25)
+
+            output_feats_dv2 = project(img_1_i, model, False)
+            output_feats_i = pca_i.project(output_feats_dv2)
+
+            inp_featup_feats_li.append(input_feats_i)
+            outp_featup_feats_li.append(output_feats_i)
+
+        input_feats = torch.cat(inp_featup_feats_li)
+        output_feats = torch.cat(outp_featup_feats_li)
+
+        if to_half_for_proj:
+            input_feats = input_feats.to(torch.float)
+            output_feats = output_feats.to(torch.float)
+
+        print(input_feats.shape)
+
+        input_feats = F.normalize(input_feats, p=1, dim=1)
+        output_feats = F.normalize(output_feats, p=1, dim=1)
+
+        return (input_feats, output_feats)
 
 
 DEVICE = "cuda:1"
@@ -147,7 +198,9 @@ if __name__ == "__main__":
     img_0 = img_0.to(DEVICE)
     img_1 = img_1.to(DEVICE)
 
-    inp_feats, outp_feats = ds.get_features_of_batches(dv2, img_0, img_1)
+    inp_feats, outp_feats = ds.get_featup_features_of_batches(
+        dv2, img_0, img_1, to_half_for_proj=False
+    )
 
     img_0 = unnorm(img_0.to("cpu")).to(torch.uint8)
     img_1 = unnorm(img_1.to("cpu")).to(torch.uint8)
@@ -155,5 +208,5 @@ if __name__ == "__main__":
     n_samples = 8
     # paired_frames_vis(img_0[:n_samples], img_1[:n_samples], "out.png")
     propagator_batch_vis(
-        img_0, img_1, inp_feats, outp_feats, outp_feats, "prop_batch_vis.png"
+        img_0, img_1, inp_feats, outp_feats, outp_feats, "prop_batch_vis.png", True
     )
