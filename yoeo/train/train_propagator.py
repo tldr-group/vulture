@@ -33,7 +33,7 @@ train_ds = VideoDataset("data", ["lvos", "mose"], "train", expr=expr)
 train_dl = DataLoader(train_ds, expr.batch_size, True)
 
 val_ds = VideoDataset("data", ["lvos", "mose"], "val", expr=expr)
-val_dl = DataLoader(train_ds, expr.batch_size, True)
+val_dl = DataLoader(val_ds, expr.batch_size, True)
 
 net = FeaturePropagator(
     expr.patch_size,
@@ -115,7 +115,7 @@ for i in range(N_EPOCHS):
 
     val_loss = 0.0
     for batch in val_dl:
-        val_loss += feed_batch_get_loss(net, dv2, opt, next(iter(val_dl)), False)
+        val_loss += feed_batch_get_loss(net, dv2, opt, batch, False)
     print(f"[{i}/{N_EPOCHS}]: train={epoch_loss}, val={val_loss}")
     train_losses.append(epoch_loss)
     val_losses.append(val_loss)
