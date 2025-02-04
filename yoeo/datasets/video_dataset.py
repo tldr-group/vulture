@@ -170,6 +170,7 @@ class VideoDataset(Dataset):
 
         return (input_feats, target_feats)
 
+    @torch.no_grad()
     def get_featup_features_of_batches(
         self,
         model: VisionTransformer,
@@ -200,8 +201,6 @@ class VideoDataset(Dataset):
         if to_half_for_proj:
             input_feats = input_feats.to(torch.float)
             output_feats = output_feats.to(torch.float)
-
-        print(input_feats.shape)
 
         input_feats = F.normalize(input_feats, p=1, dim=1)
         output_feats = F.normalize(output_feats, p=1, dim=1)
