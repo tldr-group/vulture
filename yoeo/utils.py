@@ -246,7 +246,7 @@ def get_shortest_side_resize_dims(
         sf = min(img_w / min_l, img_h / min_l)
     else:
         sf = max(min_l / img_w, min_l / img_h)
-    return (int(img_h * sf), int(img_w * sf))
+    return (int(max((img_h * sf), min_l)), int(max(img_w * sf, min_l)))
 
 
 def resize_crop(
