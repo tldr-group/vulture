@@ -15,6 +15,7 @@ from yoeo.utils import (
     expriment_from_json,
     get_shortest_side_resize_dims,
     resize_crop,
+    add_flash_attention,
 )
 from yoeo.feature_prep import get_lr_feats, project
 
@@ -84,6 +85,33 @@ class VideoDataset(Dataset):
         second_frame_idx = int(np.floor(r * (N - 1)))
         return [frames[first_frame_idx], frames[second_frame_idx]]
 
+    def transform(self, img_tensor: torch.Tensor, h: int, w: int) -> torch.Tensor:
+        img_tensor = img_tensor.to(torch.float32)
+        h, w = get_shortest_side_resize_dims(h, w, MIN_L)
+        img_tensor = TF.resize(img_tensor, [h, w])
+        img_tensor = TF.center_crop(img_tensor, [MIN_L, MIN_L])
+
+        flip_h: bool = torch.rand(1) < self.expr.flip_h_prob  # type: ignore
+        flip_v: bool = torch.rand(1) < self.expr.flip_v_prob  # type: ignore
+
+        angles_deg = self.expr.angles_deg
+
+        if flip_h:
+            img_tensor = TF.hflip(img_tensor)
+        if flip_v:
+            img_tensor = TF.vflip(img_tensor)
+
+        if len(angles_deg) > 0:
+            rotate_deg = angles_deg[torch.randint(len(angles_deg), (1,))]
+            img_tensor = TF.rotate(img_tensor, rotate_deg)
+
+        if self.expr.norm:
+            img_tensor = TF.normalize(
+                img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+            )
+
+        return img_tensor
+
     def _get_dir(self, folder: str, frame: str) -> str:
         return f"{self.root_dir}/{self.subdir}/JPEGImages/{folder}/{frame}.jpg"
 
@@ -99,12 +127,8 @@ class VideoDataset(Dataset):
         for i in range(2):
             pil = Image.open(f"{folder}/{chosen_frames[i]}")
             tensor = TF.pil_to_tensor(pil)
-            tensor = tensor.to(torch.float32)
-            h, w = get_shortest_side_resize_dims(pil.height, pil.width, MIN_L)
-            resized = TF.resize(tensor, [h, w])
-            cropped = TF.center_crop(resized, [MIN_L, MIN_L])
-            normed = TF.normalize(cropped, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            imgs.append(normed)
+            tensor = self.transform(tensor, pil.height, pil.width)
+            imgs.append(tensor)
         imgs_0, imgs_1 = imgs
         return (imgs_0, imgs_1)
 
@@ -189,9 +213,10 @@ DEVICE = "cuda:1"
 if __name__ == "__main__":
 
     dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14_reg")
-    dv2 = dv2.eval().to(DEVICE)
+    dv2 = add_flash_attention(dv2)
+    dv2 = dv2.eval().half().to(DEVICE)
 
-    expr = expriment_from_json("yoeo/models/configs/simple_no_trs_dv2.json")
+    expr = expriment_from_json("yoeo/models/configs/simple_prop.json")
     ds = VideoDataset("data", ["lvos", "mose"], "train", expr)
     dl = DataLoader(ds, 20, True)
     img_0, img_1 = next(iter(dl))
@@ -199,7 +224,7 @@ if __name__ == "__main__":
     img_1 = img_1.to(DEVICE)
 
     inp_feats, outp_feats = ds.get_featup_features_of_batches(
-        dv2, img_0, img_1, to_half_for_proj=False
+        dv2, img_0, img_1, to_half_for_proj=True
     )
 
     img_0 = unnorm(img_0.to("cpu")).to(torch.uint8)
