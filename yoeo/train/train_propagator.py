@@ -22,12 +22,11 @@ DEVICE = "cuda:1"
 
 
 dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14_reg")
-dv2.eval().to(DEVICE)
-# dv2 = add_flash_attention(dv2)
-# dv2 = dv2.eval().to(DEVICE).half()
+dv2 = add_flash_attention(dv2)
+dv2 = dv2.eval().to(DEVICE).half()
 
 
-expr = expriment_from_json("yoeo/models/configs/simple_no_trs_dv2.json")
+expr = expriment_from_json("yoeo/models/configs/simple_prop.json")
 print(expr)
 
 train_ds = VideoDataset("data", ["lvos", "mose"], "train", expr=expr)
@@ -80,7 +79,7 @@ def feed_batch_get_loss(
         img_1.to(DEVICE).to(torch.float32),
     )
 
-    input_feats, target_feats = train_ds.get_features_of_batches(
+    input_feats, target_feats = train_ds.get_featup_features_of_batches(
         ref_feat_model, img_0, img_1
     )
 
@@ -127,7 +126,9 @@ for i in range(N_EPOCHS):
             img_1.to(DEVICE).to(torch.float32),
         )
 
-        input_feats, target_feats = train_ds.get_features_of_batches(dv2, img_0, img_1)
+        input_feats, target_feats = train_ds.get_featup_features_of_batches(
+            dv2, img_0, img_1
+        )
 
         input_feats, target_feats = (
             input_feats.to(DEVICE),
@@ -146,6 +147,7 @@ for i in range(N_EPOCHS):
             target_feats,
             pred_feats,
             f"experiments/current/val_{i}.png",
+            True,
         )
 
         plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
