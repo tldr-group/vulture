@@ -1,3 +1,4 @@
+from featup.util import PCAUnprojector
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -113,9 +114,23 @@ class JitteredImage(Dataset):
         )
 
 
+def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
+    _, _, h, w = x.shape
+
+    n_patch_w: int = 1 + (w - 14) // 14
+    n_patch_h: int = 1 + (h - 14) // 14
+    if fit3d:
+        feats = model.forward_features(x)[:, 5:, :]
+    else:
+        feats = model.forward_features(x)["x_norm_patchtokens"]
+    b, _, c = feats.shape
+
+    return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
+
+
 def get_lr_feats(
     model, img: torch.Tensor, n_imgs: int = 50, fit3d: bool = False
-) -> torch.Tensor:
+) -> tuple[torch.Tensor, PCAUnprojector]:
     cfg_n_images = n_imgs  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
@@ -123,27 +138,14 @@ def get_lr_feats(
     cfg_pca_batch = 50
     cfg_proj_dim = 128
 
-    def project(x: torch.Tensor) -> torch.Tensor:
-        _, _, h, w = img.shape
-
-        n_patch_w: int = 1 + (w - 14) // 14
-        n_patch_h: int = 1 + (h - 14) // 14
-        if fit3d:
-            feats = model.forward_features(x)[:, 5:, :]
-        else:
-            feats = model.forward_features(x)["x_norm_patchtokens"]
-        b, _, c = feats.shape
-
-        return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
-
     dataset = JitteredImage(img, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
     loader = DataLoader(dataset, cfg_pca_batch)
     with torch.no_grad():
-        lr_feats = project(img)
+        lr_feats = project(img, model, fit3d)
 
         jit_features = []
         for transformed_image, tp in loader:
-            jit_features.append(project(transformed_image))
+            jit_features.append(project(transformed_image, model, fit3d))
         jit_features = torch.cat(jit_features, dim=0)
         # transform_params = {k: torch.cat(v, dim=0) for k, v in transform_params.items()}
 
@@ -155,7 +157,7 @@ def get_lr_feats(
         )
         # jit_features = unprojector.project(jit_features)
         lr_feats = unprojector.project(lr_feats)
-    return lr_feats
+    return lr_feats, unprojector
 
 
 class TorchPCA(object):
