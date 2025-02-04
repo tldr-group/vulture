@@ -113,7 +113,9 @@ for i in range(N_EPOCHS):
         loss_val = feed_batch_get_loss(net, dv2, opt, batch)
         epoch_loss += loss_val
 
-    val_loss = feed_batch_get_loss(net, dv2, opt, next(iter(val_dl)), False)
+    val_loss = 0.0
+    for batch in val_dl:
+        val_loss += feed_batch_get_loss(net, dv2, opt, next(iter(val_dl)), False)
     print(f"[{i}/{N_EPOCHS}]: train={epoch_loss}, val={val_loss}")
     train_losses.append(epoch_loss)
     val_losses.append(val_loss)
