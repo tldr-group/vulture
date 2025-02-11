@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import numpy as np
 
 torch.manual_seed(0)
 np.random.seed(0)
 
-from dataset import EmbeddingDataset, DataLoader, unnorm
-from model import Combined, Simple, Skips, FeatureTransfer
+from yoeo.datasets import EmbeddingDataset, DataLoader, unnorm
+from yoeo.models import FeatureUpsampler
 from yoeo.utils import visualise, plot_losses, expriment_from_json, init_weights
 
 
@@ -16,7 +17,7 @@ torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("configs/combined_no_shift.json")
+expr = expriment_from_json("yoeo/models/configs/combined_no_shift.json")
 print(expr)
 
 train_ds = EmbeddingDataset(
@@ -33,16 +34,10 @@ val_dl = DataLoader(
     True,
 )
 
-net = Combined(
+net = FeatureUpsampler(
     expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
 ).to(DEVICE)
 
-# net = FeatureTransfer(
-#     k=expr.k,
-#     n_ch_img=expr.n_ch_guidance,
-#     n_ch_in=expr.n_ch_in,
-#     padding_mode=expr.padding_mode,
-# ).to(DEVICE)
 init_weights(net, expr.weights_init)
 
 
@@ -57,6 +52,8 @@ SAVE_PER = expr.save_per
 
 loss_dict: dict = {"smooth_l1": nn.SmoothL1Loss, "l1": nn.L1Loss, "l2": nn.MSELoss}
 loss_fn: nn.modules.loss._Loss = loss_dict[expr.loss](reduction="sum")
+
+scheduler = ReduceLROnPlateau(opt, patience=20)
 # loss_fn = torch.nn.MSELoss(reduction="sum")
 
 
@@ -108,6 +105,8 @@ for i in range(N_EPOCHS):
     print(f"[{i}/{N_EPOCHS}]: train={epoch_loss}, val={val_loss}")
     train_losses.append(epoch_loss)
     val_losses.append(val_loss)
+
+    scheduler.step(val_loss)
 
     if i % SAVE_PER == 0:
         img, lr_feats, hr_feats = next(iter(val_dl))
