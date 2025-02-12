@@ -21,10 +21,10 @@ expr = expriment_from_json("yoeo/models/configs/combined_no_shift.json")
 print(expr)
 
 train_ds = EmbeddingDataset(
-    "data/imagenet_reduced", "train", expr=expr, device=DEVICE, data_suffix="_reg"
+    "data/imagenet_reduced", "train", expr=expr, device=DEVICE, data_suffix="_fit_reg"
 )
 val_ds = EmbeddingDataset(
-    "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_reg"
+    "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_fit_reg"
 )
 
 train_dl = DataLoader(train_ds, expr.batch_size, True)
@@ -101,7 +101,7 @@ for i in range(N_EPOCHS):
 
     val_loss = 0.0
     for batch in val_dl:
-        val_loss += feed_batch_get_loss(net, opt, next(iter(val_dl)), False)
+        val_loss += feed_batch_get_loss(net, opt, batch, False)
     print(f"[{i}/{N_EPOCHS}]: train={epoch_loss}, val={val_loss}")
     train_losses.append(epoch_loss)
     val_losses.append(val_loss)
@@ -120,7 +120,7 @@ for i in range(N_EPOCHS):
         img = unnorm(img)
         img = img.to(torch.uint8)
         visualise(
-            img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png"
+            img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png", True
         )
         plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
 
