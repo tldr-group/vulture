@@ -388,10 +388,11 @@ def visualise(
     hr_feats: torch.Tensor,
     pred_hr_feats: torch.Tensor | None,
     out_path: str,
+    is_featup: bool = False
 ) -> None:
     # b, c, h, w = hr_feats.shape
     n_rows = 4 if isinstance(pred_hr_feats, torch.Tensor) else 3
-    arrs = get_arrs_from_batch(img, lr_feats, hr_feats, pred_hr_feats)
+    arrs = get_arrs_from_batch(img, lr_feats, hr_feats, pred_hr_feats, is_featup)
     fig, axs = plt.subplots(nrows=n_rows, ncols=len(arrs))
     fig.set_size_inches(32, 4.4)
     for i, arr in enumerate(arrs):

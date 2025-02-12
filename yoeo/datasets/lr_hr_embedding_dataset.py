@@ -33,7 +33,7 @@ class EmbeddingDataset(Dataset):
         expr: Experiment,
         using_splits: bool = True,
         device: str = "cuda:1",
-        data_suffix: Literal["", "_reg"] = "",
+        data_suffix: Literal["", "_reg", "_fit_reg"] = "",
     ) -> None:
         super().__init__()
 
@@ -136,12 +136,12 @@ if __name__ == "__main__":
         "data/imagenet_reduced",
         "val",
         Experiment("test"),
-        data_suffix="_reg",
+        data_suffix="_fit_reg",
     )
     dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)
-    visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "batch_vis.png")
+    visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "batch_vis.png", True)
 
 
 """"
