@@ -21,13 +21,15 @@ torch.backends.cudnn.enabled = True
 
 
 DEVICE = "cuda:1"
-# dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
+#dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14_reg")
 dv2 = torch.hub.load("ywyue/FiT3D", "dinov2_reg_small_fine")
 dv2 = add_flash_attention(dv2)
 dv2 = dv2.eval().to(DEVICE).half()
 
+#model_path = "trained_models/e1000_reg.pth"
+model_path = "trained_models/e5000_full_fit_reg.pth"
 upsampler_weights = torch.load(
-    "trained_models/e5000_full_fit_reg.pth", weights_only=True
+    model_path, weights_only=True
 )
 
 """
@@ -49,7 +51,7 @@ upsampler = FeatureUpsampler(
 upsampler.load_state_dict(upsampler_weights)
 upsampler = upsampler.eval().to(DEVICE)
 
-path = "data/compare/white_square_small.png"
+path = "data/compare/0.png"
 
 L = 322 * 2  # 2 * 224
 _img = Image.open(path).convert("RGB")  # .resize((L, L))
@@ -93,7 +95,7 @@ def _to_s(t: int) -> float:
 m0 = torch.cuda.max_memory_allocated(img.device)
 t0 = time_ns()
 
-reduced_tensor = get_lr_feats(dv2, img, 50, fit3d=True)
+reduced_tensor, _ = get_lr_feats(dv2, img, 50, fit3d=True)
 torch.cuda.synchronize(img.device)
 t1 = time_ns()
 m1 = torch.cuda.max_memory_allocated(img.device)
