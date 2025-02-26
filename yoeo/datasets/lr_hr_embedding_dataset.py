@@ -127,6 +127,11 @@ class EmbeddingDataset(Dataset):
         img = Image.open(
             f"{self.img_dir}/{chosen_fname_val % 10}/{chosen_fname_val}.png"
         )
+
+        if lr_feats.shape[0] != self.expr.n_ch_in:         
+            lr_feats = lr_feats[:self.expr.n_ch_in]
+        if hr_feats.shape[0] != self.expr.n_ch_out:         
+            hr_feats = hr_feats[:self.expr.n_ch_out]
         # randomly sample transform, apply to img, lr, hr
         return self.transform(img, lr_feats, hr_feats)
 
@@ -135,7 +140,7 @@ if __name__ == "__main__":
     ds = EmbeddingDataset(
         "data/imagenet_reduced",
         "val",
-        Experiment("test"),
+        Experiment("test", n_ch_in=16, n_ch_out=16),
         data_suffix="_fit_reg",
     )
     dl = DataLoader(ds, 20, True)
