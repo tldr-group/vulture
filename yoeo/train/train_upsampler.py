@@ -17,7 +17,7 @@ torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("yoeo/models/configs/combined_no_shift.json")
+expr = expriment_from_json("yoeo/models/configs/upsampler_fewer_features.json")#combined_no_shift
 print(expr)
 
 train_ds = EmbeddingDataset(
@@ -35,7 +35,7 @@ val_dl = DataLoader(
 )
 
 net = FeatureUpsampler(
-    expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, feat_weight=expr.feat_weight
+    expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, n_ch_out=expr.n_ch_out, feat_weight=expr.feat_weight
 ).to(DEVICE)
 
 init_weights(net, expr.weights_init)
