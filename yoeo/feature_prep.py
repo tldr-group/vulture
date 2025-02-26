@@ -8,6 +8,8 @@ import numpy as np
 import random
 from sklearn.decomposition import PCA
 
+from random import choice
+
 """
 This code is loosely adapted/directly taken from FeatUp [1, 2], whose high-res implict features I use as a training target
 for my upsampler. When training their implict upsampler per-image they prepare a dataset of features (from, say, DINO) of
@@ -93,8 +95,8 @@ def sample_transform(use_flips, max_pad, max_zoom, h, w):
 
 class JitteredImage(Dataset):
 
-    def __init__(self, img, length, use_flips, max_zoom, max_pad):
-        self.img = img
+    def __init__(self, imgs: list[torch.Tensor], length, use_flips, max_zoom, max_pad):
+        self.imgs = imgs
         self.length = length
         self.use_flips = use_flips
         self.max_zoom = max_zoom
@@ -104,12 +106,13 @@ class JitteredImage(Dataset):
         return self.length
 
     def __getitem__(self, item):
-        h, w = self.img.shape[2:]
+        img = choice(self.imgs)
+        h, w = img.shape[2:]
         transform_params = sample_transform(
             self.use_flips, self.max_pad, self.max_zoom, h, w
         )
         return (
-            apply_jitter(self.img, self.max_pad, transform_params).squeeze(0),
+            apply_jitter(img, self.max_pad, transform_params).squeeze(0),
             transform_params,
         )
 
@@ -129,25 +132,24 @@ def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
 
 
 def get_lr_feats(
-    model, img: torch.Tensor, n_imgs: int = 50, fit3d: bool = False
+    model, imgs: list[torch.Tensor], n_imgs: int = 50, fit3d: bool = False
 ) -> tuple[torch.Tensor, PCAUnprojector]:
-    cfg_n_images = n_imgs  # 3000  # 3000
+    cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
     cfg_max_pad = 30
     cfg_pca_batch = 50
     cfg_proj_dim = 128
 
-    dataset = JitteredImage(img, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
+    dataset = JitteredImage(imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
     loader = DataLoader(dataset, cfg_pca_batch)
     with torch.no_grad():
-        lr_feats = project(img, model, fit3d)
+        lr_feats = project(imgs[0], model, fit3d)
 
         jit_features = []
         for transformed_image, tp in loader:
             jit_features.append(project(transformed_image, model, fit3d))
         jit_features = torch.cat(jit_features, dim=0)
-        # transform_params = {k: torch.cat(v, dim=0) for k, v in transform_params.items()}
 
         unprojector = PCAUnprojector(
             jit_features[:cfg_pca_batch],
@@ -155,7 +157,6 @@ def get_lr_feats(
             lr_feats.device,
             use_torch_pca=True,
         )
-        # jit_features = unprojector.project(jit_features)
         lr_feats = unprojector.project(lr_feats)
     return lr_feats, unprojector
 
