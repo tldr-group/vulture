@@ -53,7 +53,7 @@ SAVE_PER = expr.save_per
 loss_dict: dict = {"smooth_l1": nn.SmoothL1Loss, "l1": nn.L1Loss, "l2": nn.MSELoss}
 loss_fn: nn.modules.loss._Loss = loss_dict[expr.loss](reduction="sum")
 
-scheduler = ReduceLROnPlateau(opt, patience=20)
+# scheduler = ReduceLROnPlateau(opt, patience=20)
 # loss_fn = torch.nn.MSELoss(reduction="sum")
 
 
@@ -106,7 +106,7 @@ for i in range(N_EPOCHS):
     train_losses.append(epoch_loss)
     val_losses.append(val_loss)
 
-    scheduler.step(val_loss)
+    # scheduler.step(val_loss)
 
     if i % SAVE_PER == 0:
         img, lr_feats, hr_feats = next(iter(val_dl))

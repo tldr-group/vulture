@@ -132,14 +132,14 @@ def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
 
 
 def get_lr_feats(
-    model, imgs: list[torch.Tensor], n_imgs: int = 50, fit3d: bool = False
+    model, imgs: list[torch.Tensor], n_imgs: int = 50, fit3d: bool = False, n_feats_in: int=128
 ) -> tuple[torch.Tensor, PCAUnprojector]:
     cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
     cfg_max_pad = 30
     cfg_pca_batch = 50
-    cfg_proj_dim = 128
+    cfg_proj_dim = n_feats_in
 
     dataset = JitteredImage(imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
     loader = DataLoader(dataset, cfg_pca_batch)
