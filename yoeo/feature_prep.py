@@ -1,4 +1,3 @@
-from featup.util import PCAUnprojector
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -47,194 +46,7 @@ the propagator to quickly extract the LR-features so they can be input into the 
 """
 
 
-def apply_jitter(img, max_pad, transform_params):
-    h, w = img.shape[2:]
-
-    padded = F.pad(img, [max_pad] * 4, mode="reflect")
-
-    zoom = transform_params["zoom"].item()
-    x = transform_params["x"].item()
-    y = transform_params["y"].item()
-    flip = transform_params["flip"].item()
-
-    if zoom > 1.0:
-        zoomed = F.interpolate(padded, scale_factor=zoom, mode="bilinear")
-    else:
-        zoomed = padded
-
-    cropped = zoomed[:, :, x : h + x, y : w + y]
-
-    if flip:
-        return torch.flip(cropped, [3])
-    else:
-        return cropped
-
-
-def sample_transform(use_flips, max_pad, max_zoom, h, w):
-    if use_flips:
-        flip = random.random() > 0.5
-    else:
-        flip = False
-
-    apply_zoom = random.random() > 0.5
-    if apply_zoom:
-        zoom = random.random() * (max_zoom - 1) + 1
-    else:
-        zoom = 1.0
-
-    valid_area_h = (int((h + max_pad * 2) * zoom) - h) + 1
-    valid_area_w = (int((w + max_pad * 2) * zoom) - w) + 1
-
-    return {
-        "x": torch.tensor(torch.randint(0, valid_area_h, ()).item()),
-        "y": torch.tensor(torch.randint(0, valid_area_w, ()).item()),
-        "zoom": torch.tensor(zoom),
-        "flip": torch.tensor(flip),
-    }
-
-
-class JitteredImage(Dataset):
-
-    def __init__(self, imgs: list[torch.Tensor], length, use_flips, max_zoom, max_pad):
-        self.imgs = imgs
-        self.length = length
-        self.use_flips = use_flips
-        self.max_zoom = max_zoom
-        self.max_pad = max_pad
-
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, item):
-        img = choice(self.imgs)
-        h, w = img.shape[2:]
-        transform_params = sample_transform(
-            self.use_flips, self.max_pad, self.max_zoom, h, w
-        )
-        return (
-            apply_jitter(img, self.max_pad, transform_params).squeeze(0),
-            transform_params,
-        )
-
-
-def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
-    _, _, h, w = x.shape
-
-    n_patch_w: int = 1 + (w - 14) // 14
-    n_patch_h: int = 1 + (h - 14) // 14
-    if fit3d:
-        feats = model.forward_features(x)[:, 5:, :]
-    else:
-        feats = model.forward_features(x)["x_norm_patchtokens"]
-    b, _, c = feats.shape
-
-    return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
-
-
-def get_lr_feats(
-    model, imgs: list[torch.Tensor], n_imgs: int = 50, fit3d: bool = False, n_feats_in: int=128
-) -> tuple[torch.Tensor, PCAUnprojector]:
-    cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
-    cfg_use_flips = True
-    cfg_max_zoom = 1.8
-    cfg_max_pad = 30
-    cfg_pca_batch = 50
-    cfg_proj_dim = n_feats_in
-
-    dataset = JitteredImage(imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
-    loader = DataLoader(dataset, cfg_pca_batch)
-    with torch.no_grad():
-        lr_feats = project(imgs[0], model, fit3d)
-
-        jit_features = []
-        for transformed_image, tp in loader:
-            jit_features.append(project(transformed_image, model, fit3d))
-        jit_features = torch.cat(jit_features, dim=0)
-
-        unprojector = PCAUnprojector(
-            jit_features[:cfg_pca_batch],
-            cfg_proj_dim,
-            lr_feats.device,
-            use_torch_pca=True,
-        )
-        lr_feats = unprojector.project(lr_feats)
-    return lr_feats, unprojector
-
-
-class TorchPCA(object):
-
-    def __init__(self, n_components):
-        self.n_components = n_components
-
-    def fit(self, X):
-        self.mean_ = X.mean(dim=0)
-        unbiased = X - self.mean_.unsqueeze(0)
-        U, S, V = torch.pca_lowrank(
-            unbiased, q=self.n_components, center=False, niter=4
-        )
-        self.components_ = V.T
-        self.singular_values_ = S
-        return self
-
-    def transform(self, X):
-        t0 = X - self.mean_.unsqueeze(0)
-        projected = t0 @ self.components_.T
-        return projected
-
-
-def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=None):
-    device = image_feats_list[0].device
-
-    def flatten(tensor, target_size=None):
-        if target_size is not None and fit_pca is None:
-            tensor = F.interpolate(tensor, (target_size, target_size), mode="bilinear")
-        B, C, H, W = tensor.shape
-        return (
-            tensor.permute(1, 0, 2, 3)
-            .reshape(C, B * H * W)
-            .permute(1, 0)
-            # .detach()
-            # .cpu()
-        )
-
-    if len(image_feats_list) > 1 and fit_pca is None:
-        target_size = image_feats_list[0].shape[2]
-    else:
-        target_size = None
-
-    flattened_feats = []
-    for feats in image_feats_list:
-        flattened_feats.append(flatten(feats, target_size))
-    x = torch.cat(flattened_feats, dim=0)
-
-    # Subsample the data if max_samples is set and the number of samples exceeds max_samples
-    if max_samples is not None and x.shape[0] > max_samples:
-        indices = torch.randperm(x.shape[0])[:max_samples]
-        x = x[indices]
-
-    if fit_pca is None:
-        if use_torch_pca:
-            fit_pca = TorchPCA(n_components=dim).fit(x.to(torch.float32))
-        else:
-            fit_pca = PCA(n_components=dim).fit(x)
-
-    reduced_feats = []
-    for feats in image_feats_list:
-        x_red = fit_pca.transform(flatten(feats))
-        if isinstance(x_red, np.ndarray):
-            x_red = torch.from_numpy(x_red)
-        x_red -= x_red.min(dim=0, keepdim=True).values
-        x_red /= x_red.max(dim=0, keepdim=True).values
-        B, C, H, W = feats.shape
-        reduced_feats.append(
-            x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2)
-        )  # .to(device)
-
-    return reduced_feats, fit_pca
-
-
 class PCAUnprojector(nn.Module):
-
     def __init__(self, feats, dim, device, use_torch_pca=False, **kwargs):
         super().__init__()
         self.dim = dim
@@ -295,6 +107,194 @@ class PCAUnprojector(nn.Module):
             t0 = feats_reshaped - self.mean_.unsqueeze(0).to(feats.device)
             projected = t0 @ self.components_.t().to(feats.device)
             return projected.reshape(b, h, w, self.dim).permute(0, 3, 1, 2)
+
+
+def apply_jitter(img, max_pad, transform_params):
+    h, w = img.shape[2:]
+
+    padded = F.pad(img, [max_pad] * 4, mode="reflect")
+
+    zoom = transform_params["zoom"].item()
+    x = transform_params["x"].item()
+    y = transform_params["y"].item()
+    flip = transform_params["flip"].item()
+
+    if zoom > 1.0:
+        zoomed = F.interpolate(padded, scale_factor=zoom, mode="bilinear")
+    else:
+        zoomed = padded
+
+    cropped = zoomed[:, :, x : h + x, y : w + y]
+
+    if flip:
+        return torch.flip(cropped, [3])
+    else:
+        return cropped
+
+
+def sample_transform(use_flips, max_pad, max_zoom, h, w):
+    if use_flips:
+        flip = random.random() > 0.5
+    else:
+        flip = False
+
+    apply_zoom = random.random() > 0.5
+    if apply_zoom:
+        zoom = random.random() * (max_zoom - 1) + 1
+    else:
+        zoom = 1.0
+
+    valid_area_h = (int((h + max_pad * 2) * zoom) - h) + 1
+    valid_area_w = (int((w + max_pad * 2) * zoom) - w) + 1
+
+    return {
+        "x": torch.tensor(torch.randint(0, valid_area_h, ()).item()),
+        "y": torch.tensor(torch.randint(0, valid_area_w, ()).item()),
+        "zoom": torch.tensor(zoom),
+        "flip": torch.tensor(flip),
+    }
+
+
+class JitteredImage(Dataset):
+    def __init__(self, imgs: list[torch.Tensor], length, use_flips, max_zoom, max_pad):
+        self.imgs = imgs
+        self.length = length
+        self.use_flips = use_flips
+        self.max_zoom = max_zoom
+        self.max_pad = max_pad
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, item):
+        img = choice(self.imgs)
+        h, w = img.shape[2:]
+        transform_params = sample_transform(
+            self.use_flips, self.max_pad, self.max_zoom, h, w
+        )
+        return (
+            apply_jitter(img, self.max_pad, transform_params).squeeze(0),
+            transform_params,
+        )
+
+
+def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
+    _, _, h, w = x.shape
+
+    n_patch_w: int = 1 + (w - 14) // 14
+    n_patch_h: int = 1 + (h - 14) // 14
+    if fit3d:
+        feats = model.forward_features(x)[:, 5:, :]
+    else:
+        feats = model.forward_features(x)["x_norm_patchtokens"]
+    b, _, c = feats.shape
+
+    return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
+
+
+def get_lr_feats(
+    model,
+    imgs: list[torch.Tensor],
+    n_imgs: int = 50,
+    fit3d: bool = False,
+    n_feats_in: int = 128,
+) -> tuple[torch.Tensor, PCAUnprojector]:
+    cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
+    cfg_use_flips = True
+    cfg_max_zoom = 1.8
+    cfg_max_pad = 30
+    cfg_pca_batch = 50
+    cfg_proj_dim = n_feats_in
+
+    dataset = JitteredImage(
+        imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad
+    )
+    loader = DataLoader(dataset, cfg_pca_batch)
+    with torch.no_grad():
+        lr_feats = project(imgs[0], model, fit3d)
+
+        jit_features = []
+        for transformed_image, tp in loader:
+            jit_features.append(project(transformed_image, model, fit3d))
+        jit_features = torch.cat(jit_features, dim=0)
+
+        unprojector = PCAUnprojector(
+            jit_features[:cfg_pca_batch],
+            cfg_proj_dim,
+            lr_feats.device,
+            use_torch_pca=True,
+        )
+        lr_feats = unprojector.project(lr_feats)
+    return lr_feats, unprojector
+
+
+class TorchPCA(object):
+    def __init__(self, n_components):
+        self.n_components = n_components
+
+    def fit(self, X):
+        self.mean_ = X.mean(dim=0)
+        unbiased = X - self.mean_.unsqueeze(0)
+        U, S, V = torch.pca_lowrank(
+            unbiased, q=self.n_components, center=False, niter=4
+        )
+        self.components_ = V.T
+        self.singular_values_ = S
+        return self
+
+    def transform(self, X):
+        t0 = X - self.mean_.unsqueeze(0)
+        projected = t0 @ self.components_.T
+        return projected
+
+
+def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=None):
+    device = image_feats_list[0].device
+
+    def flatten(tensor, target_size=None):
+        if target_size is not None and fit_pca is None:
+            tensor = F.interpolate(tensor, (target_size, target_size), mode="bilinear")
+        B, C, H, W = tensor.shape
+        return (
+            tensor.permute(1, 0, 2, 3).reshape(C, B * H * W).permute(1, 0)
+            # .detach()
+            # .cpu()
+        )
+
+    if len(image_feats_list) > 1 and fit_pca is None:
+        target_size = image_feats_list[0].shape[2]
+    else:
+        target_size = None
+
+    flattened_feats = []
+    for feats in image_feats_list:
+        flattened_feats.append(flatten(feats, target_size))
+    x = torch.cat(flattened_feats, dim=0)
+
+    # Subsample the data if max_samples is set and the number of samples exceeds max_samples
+    if max_samples is not None and x.shape[0] > max_samples:
+        indices = torch.randperm(x.shape[0])[:max_samples]
+        x = x[indices]
+
+    if fit_pca is None:
+        if use_torch_pca:
+            fit_pca = TorchPCA(n_components=dim).fit(x.to(torch.float32))
+        else:
+            fit_pca = PCA(n_components=dim).fit(x)
+
+    reduced_feats = []
+    for feats in image_feats_list:
+        x_red = fit_pca.transform(flatten(feats))
+        if isinstance(x_red, np.ndarray):
+            x_red = torch.from_numpy(x_red)
+        x_red -= x_red.min(dim=0, keepdim=True).values
+        x_red /= x_red.max(dim=0, keepdim=True).values
+        B, C, H, W = feats.shape
+        reduced_feats.append(
+            x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2)
+        )  # .to(device)
+
+    return reduced_feats, fit_pca
 
 
 def prep_image(t, subtract_min=True):
