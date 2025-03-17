@@ -170,5 +170,5 @@ experiments/
 trained_models/
 paper/
 
-test.png
+test*.png
 batch_vis.png
