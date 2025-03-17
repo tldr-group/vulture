@@ -282,12 +282,13 @@ def convert_image(
     to_gpu: bool = True,
     to_half: bool = True,
     batch: bool = True,
+    device_str: str = "cuda:0",
 ) -> torch.Tensor:
     tensor: torch.Tensor = transform(img)  # type: ignore
     if to_half:
         tensor = tensor.to(torch.float16)
     if to_gpu:
-        tensor = tensor.to("cuda:1")
+        tensor = tensor.to(device_str)
     if batch:
         tensor = tensor.unsqueeze(0)
     return tensor
@@ -301,7 +302,6 @@ def measure_mem_time(
     feats: torch.Tensor,
     model: torch.nn.Module,
 ) -> tuple[float, float]:
-
     torch.cuda.reset_peak_memory_stats(feats.device)  # s.t memory is accurate
     torch.cuda.synchronize(feats.device)  # s.t time is accurate
 
@@ -388,7 +388,7 @@ def visualise(
     hr_feats: torch.Tensor,
     pred_hr_feats: torch.Tensor | None,
     out_path: str,
-    is_featup: bool = False
+    is_featup: bool = False,
 ) -> None:
     # b, c, h, w = hr_feats.shape
     n_rows = 4 if isinstance(pred_hr_feats, torch.Tensor) else 3
@@ -456,7 +456,6 @@ def propagator_batch_vis(
     )
     for i, arr in enumerate(arrs):
         for j, sub_arr in enumerate(arr):
-
             if len(arrs) == 1:
                 axs[j].imshow(sub_arr)
                 axs[j].set_axis_off()
