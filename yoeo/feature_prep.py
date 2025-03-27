@@ -198,12 +198,13 @@ def get_lr_feats(
     n_imgs: int = 50,
     fit3d: bool = False,
     n_feats_in: int = 128,
+    n_batch: int = 50,
 ) -> tuple[torch.Tensor, PCAUnprojector]:
     cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
     cfg_max_pad = 30
-    cfg_pca_batch = 50
+    cfg_pca_batch = n_batch
     cfg_proj_dim = n_feats_in
 
     dataset = JitteredImage(

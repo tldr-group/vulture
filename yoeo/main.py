@@ -61,6 +61,7 @@ def get_upsampler_and_expr(
     return upsampler, expr
 
 
+@torch.no_grad()
 def get_hr_feats(
     image: Image.Image | np.ndarray,
     dv2: torch.nn.Module,
@@ -69,6 +70,7 @@ def get_hr_feats(
     fit_3d: bool = True,
     n_imgs_for_red: int = 50,
     n_ch_in: int = 64,
+    n_batch_lr: int = 50,
 ):
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image).convert("RGB")
@@ -86,7 +88,12 @@ def get_hr_feats(
         .to(device)
     )
     reduced_tensor, _ = get_lr_feats(
-        dv2, [cropped_tensor.half()], n_imgs_for_red, fit3d=fit_3d, n_feats_in=n_ch_in
+        dv2,
+        [cropped_tensor.half()],
+        n_imgs_for_red,
+        fit3d=fit_3d,
+        n_feats_in=n_ch_in,
+        n_batch=n_batch_lr,
     )
     reduced_tensor = F.normalize(reduced_tensor, p=1, dim=1)
 
