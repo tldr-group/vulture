@@ -172,3 +172,5 @@ paper/
 
 test*.png
 batch_vis.png
+
+paper_figures/*
