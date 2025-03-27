@@ -2,6 +2,9 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages]
+find = { where = ["yoeo"] }
+
 [project]
 name = "yoeo"
 version = "0.0.1"
@@ -27,4 +30,4 @@ dynamic = ["dependencies"]
 dependencies = {file = ["install/requirements.txt"]}
 
 [tool.setuptools]
-packages = ["yoeo"]
+packages = ["yoeo", "yoeo.models"]
