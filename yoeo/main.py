@@ -6,7 +6,7 @@ from PIL import Image
 import numpy as np
 
 from yoeo.models.model import FeatureUpsampler
-from yoeo.feature_prep import get_lr_feats
+from yoeo.feature_prep import get_lr_feats, PCAUnprojector
 from yoeo.utils import (
     add_flash_attention,
     expriment_from_json,
@@ -71,6 +71,7 @@ def get_hr_feats(
     n_imgs_for_red: int = 50,
     n_ch_in: int = 64,
     n_batch_lr: int = 50,
+    existing_pca: PCAUnprojector | None = None
 ):
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image).convert("RGB")
@@ -94,6 +95,7 @@ def get_hr_feats(
         fit3d=fit_3d,
         n_feats_in=n_ch_in,
         n_batch=n_batch_lr,
+        existing_pca=existing_pca
     )
     reduced_tensor = F.normalize(reduced_tensor, p=1, dim=1)
 

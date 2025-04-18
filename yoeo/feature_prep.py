@@ -199,6 +199,7 @@ def get_lr_feats(
     fit3d: bool = False,
     n_feats_in: int = 128,
     n_batch: int = 50,
+    existing_pca: PCAUnprojector | None = None
 ) -> tuple[torch.Tensor, PCAUnprojector]:
     cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
     cfg_use_flips = True
@@ -214,17 +215,20 @@ def get_lr_feats(
     with torch.no_grad():
         lr_feats = project(imgs[0], model, fit3d)
 
-        jit_features = []
-        for transformed_image, tp in loader:
-            jit_features.append(project(transformed_image, model, fit3d))
-        jit_features = torch.cat(jit_features, dim=0)
+        if existing_pca is None:
+            jit_features = []
+            for transformed_image, tp in loader:
+                jit_features.append(project(transformed_image, model, fit3d))
+            jit_features = torch.cat(jit_features, dim=0)
 
-        unprojector = PCAUnprojector(
-            jit_features[:cfg_pca_batch],
-            cfg_proj_dim,
-            lr_feats.device,
-            use_torch_pca=True,
-        )
+            unprojector = PCAUnprojector(
+                jit_features[:cfg_pca_batch],
+                cfg_proj_dim,
+                lr_feats.device,
+                use_torch_pca=True,
+            )
+        else:
+            unprojector = existing_pca
         lr_feats = unprojector.project(lr_feats)
     return lr_feats, unprojector
 
