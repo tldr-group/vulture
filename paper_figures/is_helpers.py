@@ -140,6 +140,8 @@ def eval_preds(dataset: AllowedDatasets, preds: dict[str, np.ndarray], path: str
     mious: list[float] = []
     seg_fnames = sorted(listdir(f"{path}/{dataset}/segmentations"))
     for i, fname in enumerate(seg_fnames):
+        if fname not in list(preds.keys()):
+            continue
         seg_path = f"{path}/{dataset}/segmentations/{fname}"
         pred = preds[fname]
         ground_truth = load_labels(seg_path)
