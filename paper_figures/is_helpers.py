@@ -11,16 +11,14 @@ from yoeo.main import (
 )
 from yoeo.models import FeatureUpsampler
 from yoeo.utils import to_numpy
+from yoeo.feature_prep import PCAUnprojector
 
 from os import listdir
 
 from interactive_seg_backend import featurise_
 from interactive_seg_backend.configs import TrainingConfig
 from interactive_seg_backend.classifiers.base import Classifier
-from interactive_seg_backend.file_handling import (
-    load_labels,
-    load_image,
-)
+from interactive_seg_backend.file_handling import load_labels, load_image, save_featurestack
 from interactive_seg_backend.core import (
     train,
     get_training_data,
@@ -45,12 +43,64 @@ def get_deep_feats(
     upsampler: FeatureUpsampler,
     expr: Experiment,
     K: int = 32,
-    existing_pca: object | None = None,
+    existing_pca: PCAUnprojector | None = None,
 ) -> np.ndarray:
     hr_feats = get_hr_feats(img, dv2, upsampler, DEVICE, n_ch_in=expr.n_ch_in, existing_pca=existing_pca)
     hr_feats_np = to_numpy(hr_feats)
     hr_feats_np = hr_feats_np.transpose((1, 2, 0))[:, :, :K]
     return hr_feats_np
+
+
+def get_pca_over_images_or_dir(
+    existing_imgs: list[Image.Image] | str,
+    dv2: torch.nn.Module,
+) -> PCAUnprojector:
+    imgs: list[Image.Image] = []
+    if type(existing_imgs) is str:
+        fnames = sorted(listdir(existing_imgs))
+        for fname in fnames:
+            img_path = f"{existing_imgs}/{fname}"
+            arr = load_image(img_path)
+            img = Image.fromarray(arr).convert("RGB")
+            imgs.append(img)
+    else:
+        assert type(existing_imgs) is list[Image.Image]
+        imgs = existing_imgs
+
+    img_tensors: list[torch.Tensor] = []
+    for img in imgs:
+        tr = closest_crop(img.height, img.width)
+        tensor = convert_image(img, tr, device_str=DEVICE)
+        img_tensors.append(tensor)
+
+    _, pca = get_lr_feats(dv2, img_tensors, n_imgs=150, fit3d=True)
+    return pca
+
+
+def get_and_cache_features_over_images(
+    dataset: AllowedDatasets,
+    train_cfg: TrainingConfig,
+    cache_path: str,
+    path: str,
+    dv2: torch.nn.Module,
+    upsampler: FeatureUpsampler,
+    expr: Experiment,
+    existing_pca: PCAUnprojector | None = None,
+):
+    for fname in sorted(listdir(f"{path}/{dataset}/images")):
+        img_path = f"{path}/{dataset}/images/{fname}.tif"
+
+        img_arr = load_image(img_path)
+        feats = featurise_(img_arr, train_cfg.feature_config)
+        if train_cfg.add_dino_features:
+            img = Image.fromarray(img_arr).convert("RGB")
+            deep_feats = get_deep_feats(img, dv2, upsampler, expr, 32, existing_pca)
+            feats = np.concatenate((feats, deep_feats), axis=-1)
+        save_featurestack(feats, cache_path, ".npy")
+
+
+# TODO: param train and apply to take list of cache strs and skip featurise if supplied
+# TODO: abstract pca computation into own function; reuse in cache feats
 
 
 def train_model_over_images(
@@ -136,7 +186,7 @@ def apply_model_over_images(
     return preds
 
 
-def eval_preds(dataset: AllowedDatasets, preds: dict[str, np.ndarray], path: str) -> float:
+def eval_preds(dataset: AllowedDatasets, preds: dict[str, np.ndarray], path: str) -> tuple[float, float]:
     mious: list[float] = []
     seg_fnames = sorted(listdir(f"{path}/{dataset}/segmentations"))
     for i, fname in enumerate(seg_fnames):
@@ -147,4 +197,4 @@ def eval_preds(dataset: AllowedDatasets, preds: dict[str, np.ndarray], path: str
         ground_truth = load_labels(seg_path)
         miou = class_avg_miou(pred, ground_truth)
         mious.append(miou)
-    return np.mean(mious)
+    return np.mean(mious), np.std(mious)
