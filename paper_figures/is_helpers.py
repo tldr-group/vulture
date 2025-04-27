@@ -18,7 +18,7 @@ from os import listdir
 from interactive_seg_backend import featurise_
 from interactive_seg_backend.configs import TrainingConfig
 from interactive_seg_backend.classifiers.base import Classifier
-from interactive_seg_backend.file_handling import load_labels, load_image, save_featurestack
+from interactive_seg_backend.file_handling import load_labels, load_image, save_featurestack, load_featurestack
 from interactive_seg_backend.core import (
     train,
     get_training_data,
@@ -52,12 +52,19 @@ def get_deep_feats(
 
 
 def get_pca_over_images_or_dir(
-    existing_imgs: list[Image.Image] | str,
+    existing_imgs: list[Image.Image] | list[str] | str,
     dv2: torch.nn.Module,
 ) -> PCAUnprojector:
     imgs: list[Image.Image] = []
     if type(existing_imgs) is str:
         fnames = sorted(listdir(existing_imgs))
+        for fname in fnames:
+            img_path = f"{existing_imgs}/{fname}"
+            arr = load_image(img_path)
+            img = Image.fromarray(arr).convert("RGB")
+            imgs.append(img)
+    elif type(existing_imgs) is list[str]:
+        fnames = existing_imgs
         for fname in fnames:
             img_path = f"{existing_imgs}/{fname}"
             arr = load_image(img_path)
@@ -100,7 +107,6 @@ def get_and_cache_features_over_images(
 
 
 # TODO: param train and apply to take list of cache strs and skip featurise if supplied
-# TODO: abstract pca computation into own function; reuse in cache feats
 
 
 def train_model_over_images(
@@ -111,21 +117,14 @@ def train_model_over_images(
     dv2: torch.nn.Module,
     upsampler: FeatureUpsampler,
     expr: Experiment,
+    feature_cache_paths: list[str] | None = None,
 ) -> tuple[Classifier, object]:
-    features, labels = [], []
+    features: list[np.ndarray] | list[str] = []
+    labels = []
 
     pca = None
     if train_cfg.add_dino_features:
-        imgs = []
-        for fname in sorted(listdir(f"{path}/{dataset}/images")):
-            img_path = f"{path}/{dataset}/images/{fname}"
-            arr = load_image(img_path)
-            img = Image.fromarray(arr).convert("RGB")
-            tr = closest_crop(img.height, img.width)
-            tensor = convert_image(img, tr, device_str=DEVICE)
-            imgs.append(tensor)
-
-        _, pca = get_lr_feats(dv2, imgs, n_imgs=150, fit3d=True)
+        pca = get_pca_over_images_or_dir(train_fnames, dv2)
 
     for fname in train_fnames:
         img_path = f"{path}/{dataset}/images/{fname}.tif"
@@ -133,6 +132,10 @@ def train_model_over_images(
 
         img_arr = load_image(img_path)
         label_arr = load_labels(labels_path)
+        labels.append(label_arr)
+
+        if feature_cache_paths is not None:
+            continue
 
         feats = featurise_(img_arr, train_cfg.feature_config)
         if train_cfg.add_dino_features:
@@ -141,7 +144,9 @@ def train_model_over_images(
             feats = np.concatenate((feats, deep_feats), axis=-1)
 
         features.append(feats)
-        labels.append(label_arr)
+
+    if feature_cache_paths is not None:
+        features = feature_cache_paths
 
     print("Finished featurising")
     fit, target = get_training_data(features, labels)
@@ -161,7 +166,8 @@ def apply_model_over_images(
     expr: Experiment,
     verbose: bool = False,
     early_cutoff_n: int = -1,
-    existing_pca: object | None = None,
+    existing_pca: PCAUnprojector | None = None,
+    feature_cache_paths: list[str] | None = None,
 ) -> dict[str, np.ndarray]:
     preds: dict[str, np.ndarray] = {}
     img_fnames = sorted(listdir(f"{path}/{dataset}/images"))
@@ -175,11 +181,14 @@ def apply_model_over_images(
         img_path = f"{path}/{dataset}/images/{fname}"
         img_arr = load_image(img_path)
 
-        feats = featurise_(img_arr, train_cfg.feature_config)
-        if train_cfg.add_dino_features:
-            img = Image.fromarray(img_arr).convert("RGB")
-            deep_feats = get_deep_feats(img, dv2, upsampler, expr, 32, existing_pca)
-            feats = np.concatenate((feats, deep_feats), axis=-1)
+        if feature_cache_paths is not None:
+            feats = load_featurestack(feature_cache_paths[i])
+        else:
+            feats = featurise_(img_arr, train_cfg.feature_config)
+            if train_cfg.add_dino_features:
+                img = Image.fromarray(img_arr).convert("RGB")
+                deep_feats = get_deep_feats(img, dv2, upsampler, expr, 32, existing_pca)
+                feats = np.concatenate((feats, deep_feats), axis=-1)
 
         pred, _ = apply(model, feats, train_cfg, image=img_arr)  # apply_(model, feats)
         preds[fname] = pred
