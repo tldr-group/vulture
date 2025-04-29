@@ -117,6 +117,8 @@ def get_and_cache_features_over_images(
 
 # TODO: param train and apply to take list of cache strs and skip featurise if supplied
 
+BaselineAdditions = Literal[None, "random", "uniform", "duplicate"]
+
 
 def train_model_over_images(
     dataset: AllowedDatasets,
@@ -129,6 +131,7 @@ def train_model_over_images(
     feature_cache_paths: list[str] | None = None,
     K: int = K_TRUNCATE,
     merge_small_class: bool = False,
+    baseline_addition: BaselineAdditions = None,
 ) -> tuple[Classifier, object]:
     features: list[np.ndarray] | list[str] = []
     labels = []
@@ -156,6 +159,17 @@ def train_model_over_images(
             img = Image.fromarray(img_arr).convert("RGB")
             deep_feats = get_deep_feats(img, dv2, upsampler, expr, K, pca)
             feats = np.concatenate((feats, deep_feats), axis=-1)
+        if baseline_addition == "random":
+            h, w, _ = feats.shape
+            noise = np.random.normal(0, 1, (h, w, K))
+            feats = np.concatenate((feats, noise), axis=-1)
+        elif baseline_addition == "uniform":
+            h, w, _ = feats.shape
+            uniform = np.zeros((h, w, K))
+            feats = np.concatenate((feats, uniform), axis=-1)
+        elif baseline_addition == "duplicate":
+            dup = feats[:, :, :K]
+            feats = np.concatenate((feats, dup), axis=-1)
 
         features.append(feats)
         print("Finished featurising")
@@ -182,6 +196,8 @@ def apply_model_over_images(
     early_cutoff_n: int = -1,
     existing_pca: PCAUnprojector | None = None,
     feature_cache_paths: list[str] | None = None,
+    K: int = K_TRUNCATE,
+    baseline_addition: BaselineAdditions = None,
 ) -> dict[str, np.ndarray]:
     preds: dict[str, np.ndarray] = {}
     img_fnames = sorted(listdir(f"{path}/{dataset}/images"))
@@ -201,8 +217,19 @@ def apply_model_over_images(
             feats = featurise_(img_arr, train_cfg.feature_config)
             if train_cfg.add_dino_features:
                 img = Image.fromarray(img_arr).convert("RGB")
-                deep_feats = get_deep_feats(img, dv2, upsampler, expr, 32, existing_pca)
+                deep_feats = get_deep_feats(img, dv2, upsampler, expr, K, existing_pca)
                 feats = np.concatenate((feats, deep_feats), axis=-1)
+            if baseline_addition == "random":
+                h, w, _ = feats.shape
+                noise = np.random.normal(0, 1, (h, w, K))
+                feats = np.concatenate((feats, noise), axis=-1)
+            elif baseline_addition == "uniform":
+                h, w, _ = feats.shape
+                uniform = np.zeros((h, w, K))
+                feats = np.concatenate((feats, uniform), axis=-1)
+            elif baseline_addition == "duplicate":
+                dup = feats[:, :, :K]
+                feats = np.concatenate((feats, dup), axis=-1)
 
         pred, _ = apply(model, feats, train_cfg, image=img_arr)  # apply_(model, feats)
         preds[fname] = pred
