@@ -2,9 +2,6 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages]
-find = { where = ["yoeo"] }
-
 [project]
 name = "yoeo"
 version = "0.0.1"
