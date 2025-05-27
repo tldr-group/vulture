@@ -1,3 +1,4 @@
+from asyncio import FastChildWatcher
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
@@ -25,7 +26,6 @@ def shift(x: torch.Tensor, s: int, dir: tuple[int, int]) -> torch.Tensor:
 
 
 class EmbeddingDataset(Dataset):
-
     def __init__(
         self,
         root_dir: str,
@@ -33,24 +33,19 @@ class EmbeddingDataset(Dataset):
         expr: Experiment,
         using_splits: bool = True,
         device: str = "cuda:1",
-        data_suffix: Literal["", "_reg", "_fit_reg"] = "",
+        data_suffix: Literal["", "_reg", "_fit_reg", "_lu_reg"] = "",
     ) -> None:
         super().__init__()
 
         self.root_dir = root_dir
         self.subdir = "data" + data_suffix if which == "train" else which + data_suffix
-        self.files = sorted(
-            [
-                f"{root_dir}/{self.subdir}/{p}"
-                for p in listdir(f"{root_dir}/{self.subdir}")
-            ]
-        )
+        self.files = sorted([f"{root_dir}/{self.subdir}/{p}" for p in listdir(f"{root_dir}/{self.subdir}")])
+
         self.n = len(self.files)
         self.device = device
 
-        self.img_dir = (
-            f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
-        )
+        self.using_splits = using_splits
+        self.img_dir = f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         self.expr = expr
 
     def __len__(self):
@@ -59,7 +54,6 @@ class EmbeddingDataset(Dataset):
     def transform(
         self, img: Image.Image, lr_feats: torch.Tensor, hr_feats: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-
         img_tensor = TF.pil_to_tensor(img)
         flip_h: bool = torch.rand(1) < self.expr.flip_h_prob  # type: ignore
         flip_v: bool = torch.rand(1) < self.expr.flip_v_prob  # type: ignore
@@ -92,19 +86,16 @@ class EmbeddingDataset(Dataset):
             hr_feats = shift(hr_feats, shift_dist, shift_dir)
 
         img_tensor = img_tensor.to(torch.float32)
-        img_tensor = TF.normalize(
-            img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
-        )
+        img_tensor = TF.normalize(img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         if self.expr.norm:
             lr_feats = F.normalize(lr_feats, p=1, dim=0)
             hr_feats = F.normalize(hr_feats, p=1, dim=0)
         return img_tensor, lr_feats, hr_feats
 
-    def __getitem__(
-        self, index: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         chosen_file = self.files[index]
-        chosen_fname_val = int(chosen_file.split("/")[-1].split(".")[0])
+        chosen_fname = str(chosen_file.split("/")[-1].split(".")[0])
+        chosen_fname_val = int(chosen_fname)
         # load directly to device we specify - usually gpu
         embedding_data = torch.load(
             chosen_file,
@@ -124,14 +115,15 @@ class EmbeddingDataset(Dataset):
                 embedding_data["lr_feats"][0],
             )
 
-        img = Image.open(
-            f"{self.img_dir}/{chosen_fname_val % 10}/{chosen_fname_val}.png"
-        )
+        if self.using_splits:
+            img = Image.open(f"{self.img_dir}/{chosen_fname_val % 10}/{chosen_fname_val}.png")
+        else:
+            img = Image.open(f"{self.img_dir}/{chosen_fname}.png")
 
-        if lr_feats.shape[0] != self.expr.n_ch_in:         
-            lr_feats = lr_feats[:self.expr.n_ch_in]
-        if hr_feats.shape[0] != self.expr.n_ch_out:         
-            hr_feats = hr_feats[:self.expr.n_ch_out]
+        if lr_feats.shape[0] != self.expr.n_ch_in:
+            lr_feats = lr_feats[: self.expr.n_ch_in]
+        if hr_feats.shape[0] != self.expr.n_ch_out:
+            hr_feats = hr_feats[: self.expr.n_ch_out]
         # randomly sample transform, apply to img, lr, hr
         return self.transform(img, lr_feats, hr_feats)
 
@@ -140,13 +132,15 @@ if __name__ == "__main__":
     ds = EmbeddingDataset(
         "data/imagenet_reduced",
         "val",
-        Experiment("test", n_ch_in=16, n_ch_out=16),
-        data_suffix="_fit_reg",
+        Experiment("test", n_ch_in=384, n_ch_out=384, norm=False),
+        data_suffix="_lu_reg",
+        using_splits=False,
+        device="cuda:0",
     )
     dl = DataLoader(ds, 20, True)
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)
-    visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "batch_vis.png", True)
+    visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "tmp/batch_vis.png", False)
 
 
 """"
