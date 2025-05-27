@@ -218,17 +218,13 @@ unnormalize = transforms.Normalize(
 )
 
 
-def closest_crop(
-    h: int, w: int, patch_size: int = 14, to_tensor: bool = True
-) -> transforms.Compose:
+def closest_crop(h: int, w: int, patch_size: int = 14, to_tensor: bool = True) -> transforms.Compose:
     # Crop to h,w values that are closest to given patch/stride size
     sub_h: int = h % patch_size
     sub_w: int = w % patch_size
     new_h, new_w = h - sub_h, w - sub_w
     if to_tensor:
-        transform = transforms.Compose(
-            [transforms.CenterCrop((new_h, new_w)), to_norm_tensor]
-        )
+        transform = transforms.Compose([transforms.CenterCrop((new_h, new_w)), to_norm_tensor])
     else:
         transform = transforms.Compose(
             [
@@ -238,9 +234,7 @@ def closest_crop(
     return transform
 
 
-def get_shortest_side_resize_dims(
-    img_h: int, img_w: int, min_l: int
-) -> tuple[int, int]:
+def get_shortest_side_resize_dims(img_h: int, img_w: int, min_l: int) -> tuple[int, int]:
     if min(img_w, img_h) > min_l:
         sf = min(img_w / min_l, img_h / min_l)
     else:
@@ -248,9 +242,7 @@ def get_shortest_side_resize_dims(
     return (int(max((img_h * sf), min_l)), int(max(img_w * sf, min_l)))
 
 
-def resize_crop(
-    resize_dims: tuple[int, int], crop_dims: tuple[int, int]
-) -> transforms.Compose:
+def resize_crop(resize_dims: tuple[int, int], crop_dims: tuple[int, int]) -> transforms.Compose:
     transform = transforms.Compose(
         [
             transforms.Resize(resize_dims),
@@ -369,8 +361,8 @@ def get_arrs_from_batch(
                 data_flat = data_flat[:, :k]
                 out = data_flat
             else:
-                data_in = StandardScaler().fit_transform(data_flat)
-                out = pca.fit_transform(data_in)
+                # data_in = StandardScaler().fit_transform(data_flat)
+                out = pca.fit_transform(data_flat)
             out_rescaled = MinMaxScaler(clip=True).fit_transform(out)
             # out_rescaled = np.clip(out_rescaled, 0, 1)
 
@@ -407,9 +399,7 @@ def visualise(
     plt.close()
 
 
-def paired_frames_vis(
-    imgs_0: torch.Tensor, imgs_1: torch.Tensor, out_path: str
-) -> None:
+def paired_frames_vis(imgs_0: torch.Tensor, imgs_1: torch.Tensor, out_path: str) -> None:
     def _torch_to_np(x: torch.Tensor):
         return unnormalize(x).numpy().transpose((0, 2, 3, 1)).astype(np.uint8)
 
@@ -485,8 +475,4 @@ if __name__ == "__main__":
         img = torch.zeros((1, 3, 518, 518)).half().to(DEVICE)
         res = get_lr_feats(dv2, img, 25)
 
-    print(
-        prof.key_averages(group_by_stack_n=5).table(
-            sort_by="self_cpu_time_total", row_limit=5
-        )
-    )
+    print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cpu_time_total", row_limit=5))

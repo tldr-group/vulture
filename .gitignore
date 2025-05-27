@@ -162,6 +162,8 @@ cython_debug/
 #.idea/
 
 FeatUp/
+*LoftUp/
+*loftUp/
 .vscode/
 sample-images/
 data/
@@ -169,9 +171,11 @@ out/
 experiments/
 trained_models/
 paper/
+paper_figures/fig_out/*
 
 test*.png
 batch_vis.png
+tmp/*
 
 paper_figures/fig_data
-paper_figures/fig_out
+paper_figures/fig_outds
