@@ -17,14 +17,14 @@ torch.cuda.empty_cache()
 
 DEVICE = "cuda:1"
 
-expr = expriment_from_json("yoeo/models/configs/upsampler_fewer_features.json")#combined_no_shift
+expr = expriment_from_json("yoeo/models/configs/upsampler_full_dv2.json")
 print(expr)
 
 train_ds = EmbeddingDataset(
-    "data/imagenet_reduced", "train", expr=expr, device=DEVICE, data_suffix="_fit_reg"
+    "data/imagenet_reduced", "train", expr=expr, device=DEVICE, data_suffix="_lu_reg", using_splits=False
 )
 val_ds = EmbeddingDataset(
-    "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_fit_reg"
+    "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_lu_reg", using_splits=False
 )
 
 train_dl = DataLoader(train_ds, expr.batch_size, True)
@@ -119,9 +119,7 @@ for i in range(N_EPOCHS):
         pred_hr_feats = net(img, lr_feats)
         img = unnorm(img)
         img = img.to(torch.uint8)
-        visualise(
-            img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png", True
-        )
+        visualise(img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png", False)
         plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
 
         if val_loss < best_val_loss:
