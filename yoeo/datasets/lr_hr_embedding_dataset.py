@@ -1,4 +1,3 @@
-from asyncio import FastChildWatcher
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
@@ -7,6 +6,7 @@ from os import listdir
 from PIL import Image
 from typing import Literal
 
+from yoeo.datasets.learn_remap_LU_feats import MLP, apply
 from yoeo.utils import visualise, Experiment
 
 
@@ -47,6 +47,9 @@ class EmbeddingDataset(Dataset):
         self.using_splits = using_splits
         self.img_dir = f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         self.expr = expr
+
+        self.mlp = MLP(384, 100)
+        self.mlp = self.mlp.to(self.device)
 
     def __len__(self):
         return self.n
@@ -120,6 +123,12 @@ class EmbeddingDataset(Dataset):
         else:
             img = Image.open(f"{self.img_dir}/{chosen_fname}.png")
 
+        if "lu" in self.subdir:
+            weights = embedding_data["mlp_weights"]
+            self.mlp.load_state_dict(weights)
+            hr_feats = apply(self.mlp, hr_feats.unsqueeze(0))
+            hr_feats = hr_feats[0]
+
         if lr_feats.shape[0] != self.expr.n_ch_in:
             lr_feats = lr_feats[: self.expr.n_ch_in]
         if hr_feats.shape[0] != self.expr.n_ch_out:
@@ -138,6 +147,7 @@ if __name__ == "__main__":
         device="cuda:0",
     )
     dl = DataLoader(ds, 20, True)
+    next(iter(dl))
     img, lr, hr = next(iter(dl))
     print(img.shape, lr.shape, hr.shape)
     visualise(unnorm(img).to(torch.uint8), lr, hr, hr, "tmp/batch_vis.png", False)
