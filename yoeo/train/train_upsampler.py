@@ -91,6 +91,27 @@ def feed_batch_get_loss(
     return loss.item()
 
 
+def vis(model: nn.Module, val_dl: DataLoader) -> None:
+    img, lr_feats, hr_feats = next(iter(val_dl))
+    img, lr_feats, hr_feats = (
+        img.to(DEVICE).to(torch.float32),
+        lr_feats.to(DEVICE),
+        hr_feats.to(DEVICE),
+    )
+
+    pred_hr_feats = model(img, lr_feats)
+    img = unnorm(img)
+    img = img.to(torch.uint8)
+    visualise(img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png", False)
+    plot_losses(train_losses, val_losses, "experiments/current/losses.png")
+
+    img, lr_feats, hr_feats = (
+        img.to("cpu"),
+        lr_feats.to("cpu"),
+        hr_feats.to("cpu"),
+    )
+
+
 train_losses, val_losses = [], []
 best_val_loss = 1e10
 for i in range(N_EPOCHS):
@@ -102,27 +123,15 @@ for i in range(N_EPOCHS):
     val_loss = 0.0
     for batch in val_dl:
         val_loss += feed_batch_get_loss(net, opt, batch, False)
+
     print(f"[{i}/{N_EPOCHS}]: train={epoch_loss}, val={val_loss}")
     train_losses.append(epoch_loss)
     val_losses.append(val_loss)
 
     # scheduler.step(val_loss)
-
     if i % SAVE_PER == 0:
-        img, lr_feats, hr_feats = next(iter(val_dl))
-        img, lr_feats, hr_feats = (
-            img.to(DEVICE).to(torch.float32),
-            lr_feats.to(DEVICE),
-            hr_feats.to(DEVICE),
-        )
-
-        pred_hr_feats = net(img, lr_feats)
-        img = unnorm(img)
-        img = img.to(torch.uint8)
-        visualise(img, lr_feats, hr_feats, pred_hr_feats, f"experiments/current/val_{i}.png", False)
-        plot_losses(train_losses, val_losses, f"experiments/current/losses.png")
-
+        vis(net, val_dl)
         if val_loss < best_val_loss:
             # todo: just save every 100 epochs?
-            torch.save(net.state_dict(), f"experiments/current/best.pth")
+            torch.save(net.state_dict(), "experiments/current/best.pth")
             best_val_loss = val_loss
