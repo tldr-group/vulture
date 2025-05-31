@@ -11,7 +11,6 @@ import numpy as np
 from yoeo.utils import do_2D_pca
 import matplotlib.pyplot as plt
 
-from time import time
 
 from typing import Mapping, Any
 
@@ -22,6 +21,7 @@ DEVICE = "cuda:0"
 
 def get_train_data(lr_feats: torch.Tensor, hr_feats: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     _, c, n_t_h, n_t_w = lr_feats.shape
+    # _, c, h, w = hr_feats.shape
 
     lr_hr_feats = F.interpolate(hr_feats, (n_t_h, n_t_w), mode="bilinear")
 
@@ -31,11 +31,21 @@ def get_train_data(lr_feats: torch.Tensor, hr_feats: torch.Tensor) -> tuple[torc
     return (lr_hr_flat, lr_flat)
 
 
+# hr_lr_feats = F.interpolate(lr_feats, (h, w), mode="bilinear")
+
+# lr_flat: torch.Tensor = hr_lr_feats.reshape((c, -1)).permute((1, 0))
+# lr_hr_flat: torch.Tensor = hr_feats.reshape((c, -1)).permute((1, 0))
+
+# return (lr_hr_flat, lr_flat)
+
+
 class MLP(nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int = 100):
+    def __init__(self, input_dim: int, hidden_dim: int = 384):
         super().__init__()
         self.model = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
+            nn.LeakyReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.LeakyReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.LeakyReLU(),
@@ -53,11 +63,10 @@ def train_mlp(
     epochs: int = 100,
     lr: float = 1e-3,
     verbose=False,
+    n_dims: int = 384,
+    device: str = "cuda:0",
 ) -> MLP:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    input_dim = train_data.shape[1]
-
-    model = MLP(input_dim).to(device)
+    model = MLP(n_dims).to(device)
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
@@ -94,12 +103,20 @@ def apply(mlp: MLP, hr_feats: torch.Tensor) -> torch.Tensor:
 
 
 def vis(
-    save_path: str, img: Image.Image | None, lr_feats: torch.Tensor, hr_feats: torch.Tensor, weights: Mapping[str, Any]
+    save_path: str,
+    img: Image.Image | None,
+    lr_feats: torch.Tensor,
+    hr_feats: torch.Tensor,
+    weights: Mapping[str, Any] | None,
+    mlp: MLP | None = None,
 ):
     _, c, h_, _ = hr_feats.shape
-    mlp = MLP(c, 100)
-    mlp.load_state_dict(weights)
-    mlp = mlp.to(hr_feats.device)
+
+    if mlp is None:
+        assert weights
+        mlp = MLP(c, 384)
+        mlp.load_state_dict(weights)
+        mlp = mlp.to(hr_feats.device)
 
     res_2D = apply(mlp, hr_feats)
 
@@ -126,24 +143,44 @@ def vis(
 if __name__ == "__main__":
     PATH = "data/imagenet_reduced"
     DATA_FOLDER = "data_lu_reg"
-    fnames = sorted(listdir(f"{PATH}/{DATA_FOLDER}"))
-    N = len(fnames)
 
-    for i, fname in enumerate(fnames):
-        img = Image.open(f"{PATH}/imgs/{fname.split('.')[0]}.png")
-        data = torch.load(f"{PATH}/{DATA_FOLDER}/{fname}", weights_only=True, map_location=DEVICE)
+    fname = "00245"
 
-        lr_feats: torch.Tensor = data["lr_feats"]
-        hr_feats: torch.Tensor = data["hr_feats"]
+    img = Image.open(f"{PATH}/imgs/{fname}.png")
+    data = torch.load(f"{PATH}/{DATA_FOLDER}/{fname}.pt")
+    lr_feats: torch.Tensor = data["lr_feats"]
+    hr_feats: torch.Tensor = data["hr_feats"]
 
-        train, targ = get_train_data(lr_feats, hr_feats)
-        mlp = train_mlp(train, targ, batch_size=512, epochs=1000, lr=1e-3)
+    train, targ = get_train_data(lr_feats, hr_feats)
 
-        data["mlp_weights"] = mlp.state_dict()
-        torch.save(data, f"{PATH}/{DATA_FOLDER}/{fname}")
+    mlp = train_mlp(train, targ, 32, 1000, lr=1e-3, verbose=True)
 
-        if i % 10 == 0:
-            print(f"[{i:03d} / {N}]")
+    res = apply(mlp, hr_feats)
+
+    vis("tmp/better_remap.png", img, lr_feats, hr_feats, None, mlp)
+
+
+# if __name__ == "__main__":
+#     PATH = "data/imagenet_reduced"
+#     DATA_FOLDER = "data_lu_reg"
+#     fnames = sorted(listdir(f"{PATH}/{DATA_FOLDER}"))
+#     N = len(fnames)
+
+#     for i, fname in enumerate(fnames):
+#         img = Image.open(f"{PATH}/imgs/{fname.split('.')[0]}.png")
+#         data = torch.load(f"{PATH}/{DATA_FOLDER}/{fname}", weights_only=True, map_location=DEVICE)
+
+#         lr_feats: torch.Tensor = data["lr_feats"]
+#         hr_feats: torch.Tensor = data["hr_feats"]
+
+#         train, targ = get_train_data(lr_feats, hr_feats)
+#         mlp = train_mlp(train, targ, batch_size=512, epochs=1000, lr=1e-3)
+
+#         data["mlp_weights"] = mlp.state_dict()
+#         torch.save(data, f"{PATH}/{DATA_FOLDER}/{fname}")
+
+#         if i % 10 == 0:
+#             print(f"[{i:03d} / {N}]")
 
 
 # print(f"{end - start}s ")

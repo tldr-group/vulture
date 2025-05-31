@@ -1,7 +1,10 @@
 import numpy as np
-from loftup.upsamplers import norm, unnorm
-from loftup.featurizers import get_featurizer
-from loftup.utils import plot_feats
+from yoeo.comparisons.loftup.upsamplers import norm, unnorm
+from yoeo.comparisons.loftup.featurizers import get_featurizer
+from yoeo.comparisons.loftup.utils import plot_feats
+
+from yoeo.comparisons.online_denoiser import Denoiser
+from yoeo.datasets.learn_remap_LU_feats import get_train_data, train_mlp, apply, vis
 
 import torch
 from PIL import Image
@@ -12,6 +15,8 @@ from datasets import load_dataset
 
 from time import time
 
+REMAP = True
+DENOISE = True
 DEVICE = "cuda:1"
 
 np.random.seed(10001)
@@ -27,6 +32,11 @@ torch_hub_name = "loftup_dinov2s_reg"
 
 model, patch_size, dim = get_featurizer(featurizer_class)
 model = model.to(DEVICE)
+
+denoiser = Denoiser(feat_dim=384).to(DEVICE)
+denoiser_weights = torch.load("yoeo/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
+denoiser.load_state_dict(denoiser_weights["denoiser"])
+
 kernel_size = patch_size
 lr_size = 224 // patch_size  # 2 * 224 // patch_size
 load_size = 224
@@ -44,7 +54,7 @@ transform = T.Compose(
     ]
 )
 
-N_CUTOFF = 8_000
+N_CUTOFF = 4568
 if __name__ == "__main__":
     N = len(ds)
     data_path = "data/imagenet_reduced"
@@ -54,7 +64,17 @@ if __name__ == "__main__":
         normalized_img_tensor = transform(pil_img).unsqueeze(0).to(DEVICE)
         with torch.no_grad():
             lr_feats = model(normalized_img_tensor)
+            if DENOISE:
+                lr_feats = lr_feats.permute((0, 2, 3, 1))
+                lr_feats = denoiser.forward(lr_feats, return_channel_first=True)
             hr_feats = upsampler(lr_feats, normalized_img_tensor)  # 1, dim, 224, 224
+
+        if REMAP:
+            train, targ = get_train_data(lr_feats, hr_feats)
+            mlp = train_mlp(train, targ, 256, 2000, lr=2e-3, verbose=False, device=DEVICE)
+        with torch.no_grad():
+            hr_feats = apply(mlp, hr_feats)
+
         data = {
             "lr_feats": lr_feats,
             "dv2_lr_feats": lr_feats,
@@ -64,8 +84,9 @@ if __name__ == "__main__":
         torch.save(data, f"{data_path}/data_lu_reg/{i:05d}.pt")
         end_t = time()
 
-        if i % 100 == 0:
-            print(f"[{i:05d}/{N}] in {end_t - start_t:03f}s")
+        if i % 50 == 0:
+            print(f"[{i:05d}/{N_CUTOFF}] in {end_t - start_t:03f}s")
+            vis("tmp/better_remap.png", pil_img, lr_feats, hr_feats, None, mlp)
         if i == N_CUTOFF:
             break
 
@@ -75,6 +96,3 @@ if __name__ == "__main__":
 
 # ## Upsampling step
 # hr_feats = upsampler(lr_feats, normalized_img_tensor)  # 1, dim, 224, 224
-
-
-plot_feats(unnorm(normalized_img_tensor)[0], lr_feats[0], hr_feats[0], f"tmp/{i}.png")
