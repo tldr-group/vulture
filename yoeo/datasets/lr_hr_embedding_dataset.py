@@ -6,7 +6,7 @@ from os import listdir
 from PIL import Image
 from typing import Literal
 
-from yoeo.datasets.learn_remap_LU_feats import MLP, apply
+# from yoeo.datasets.learn_remap_LU_feats import apply
 from yoeo.utils import visualise, Experiment
 
 
@@ -49,8 +49,8 @@ class EmbeddingDataset(Dataset):
         self.img_dir = f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         self.expr = expr
 
-        self.mlp = MLP(384, 384)
-        self.mlp = self.mlp.to(self.device)
+        # self.mlp = MLP(384, 384)
+        # self.mlp = self.mlp.to(self.device)
 
         self.apply_mlp = apply_mlp
 
@@ -126,11 +126,11 @@ class EmbeddingDataset(Dataset):
         else:
             img = Image.open(f"{self.img_dir}/{chosen_fname}.png")
 
-        if self.apply_mlp:
-            weights = embedding_data["mlp_weights"]
-            self.mlp.load_state_dict(weights)
-            hr_feats = apply(self.mlp, hr_feats.unsqueeze(0))
-            hr_feats = hr_feats[0]
+        # if self.apply_mlp:
+        #     weights = embedding_data["mlp_weights"]
+        #     self.mlp.load_state_dict(weights)
+        #     hr_feats = apply(self.mlp, hr_feats.unsqueeze(0))
+        #     hr_feats = hr_feats[0]
 
         if lr_feats.shape[0] != self.expr.n_ch_in:
             lr_feats = lr_feats[: self.expr.n_ch_in]
