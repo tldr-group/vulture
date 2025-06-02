@@ -34,6 +34,7 @@ class EmbeddingDataset(Dataset):
         using_splits: bool = True,
         device: str = "cuda:1",
         data_suffix: Literal["", "_reg", "_fit_reg", "_lu_reg"] = "",
+        apply_mlp: bool = False,
     ) -> None:
         super().__init__()
 
@@ -48,8 +49,10 @@ class EmbeddingDataset(Dataset):
         self.img_dir = f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         self.expr = expr
 
-        self.mlp = MLP(384, 100)
+        self.mlp = MLP(384, 384)
         self.mlp = self.mlp.to(self.device)
+
+        self.apply_mlp = apply_mlp
 
     def __len__(self):
         return self.n
@@ -123,7 +126,7 @@ class EmbeddingDataset(Dataset):
         else:
             img = Image.open(f"{self.img_dir}/{chosen_fname}.png")
 
-        if "lu" in self.subdir:
+        if self.apply_mlp:
             weights = embedding_data["mlp_weights"]
             self.mlp.load_state_dict(weights)
             hr_feats = apply(self.mlp, hr_feats.unsqueeze(0))
@@ -144,7 +147,7 @@ if __name__ == "__main__":
         Experiment("test", n_ch_in=384, n_ch_out=384, norm=False),
         data_suffix="_lu_reg",
         using_splits=False,
-        device="cuda:0",
+        device="cuda:1",
     )
     dl = DataLoader(ds, 20, True)
     next(iter(dl))
