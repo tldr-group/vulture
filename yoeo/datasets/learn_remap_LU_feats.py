@@ -23,7 +23,8 @@ def get_train_data(lr_feats: torch.Tensor, hr_feats: torch.Tensor) -> tuple[torc
     _, c, n_t_h, n_t_w = lr_feats.shape
     # _, c, h, w = hr_feats.shape
 
-    lr_hr_feats = F.interpolate(hr_feats, (n_t_h, n_t_w), mode="bilinear")
+    # lr_hr_feats = F.interpolate(hr_feats, (n_t_h, n_t_w), mode="bilinear")
+    lr_hr_feats = F.avg_pool2d(hr_feats, (14, 14), 14)
 
     lr_flat: torch.Tensor = lr_feats.reshape((c, -1)).permute((1, 0))
     lr_hr_flat: torch.Tensor = lr_hr_feats.reshape((c, -1)).permute((1, 0))
