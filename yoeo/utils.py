@@ -63,6 +63,8 @@ class Experiment:
     loss: Literal["smooth_l1", "l1", "l2"] = "smooth_l1"
     optim: Literal["adamw", "adam", "SGD"] = "adamw"
     lr: float = 1e-3
+    clip_norm_threshold: float = 1.0
+    weight_decay: float = 7e-6
     batch_size: int = 32
     n_epochs: int = 5000
     save_per: int = 10

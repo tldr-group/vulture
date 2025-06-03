@@ -27,12 +27,8 @@ val_ds = EmbeddingDataset(
     "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_lu_reg", using_splits=False
 )
 
-train_dl = DataLoader(train_ds, expr.batch_size, True)
-val_dl = DataLoader(
-    val_ds,
-    expr.batch_size,
-    True,
-)
+train_dl = DataLoader(train_ds, expr.batch_size, True, drop_last=True)
+val_dl = DataLoader(val_ds, expr.batch_size, True, drop_last=True)
 
 net = FeatureUpsampler(
     expr.patch_size, k_up=expr.k, n_ch_in=expr.n_ch_in, n_ch_out=expr.n_ch_out, feat_weight=expr.feat_weight
@@ -51,7 +47,7 @@ N_EPOCHS = expr.n_epochs
 SAVE_PER = expr.save_per
 
 loss_dict: dict = {"smooth_l1": nn.SmoothL1Loss, "l1": nn.L1Loss, "l2": nn.MSELoss}
-loss_fn: nn.modules.loss._Loss = loss_dict[expr.loss](reduction="sum")
+loss_fn: nn.modules.loss._Loss = loss_dict[expr.loss](reduction="sum", weight_decay=expr.weight_decay)
 
 # scheduler = ReduceLROnPlateau(opt, patience=20)
 # loss_fn = torch.nn.MSELoss(reduction="sum")
@@ -62,6 +58,7 @@ def feed_batch_get_loss(
     opt,
     batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
     training: bool = True,
+    clip_norm_threshold: float = 1.0,
 ) -> float:
     if training:
         model.train()
@@ -80,6 +77,8 @@ def feed_batch_get_loss(
     loss = loss_fn(pred_hr_feats, hr_feats)
     if training:
         loss.backward()
+        if clip_norm_threshold > 0.0:
+            nn.utils.clip_grad_norm_(model.parameters(), clip_norm_threshold)
         opt.step()
 
     img, lr_feats, hr_feats = (
@@ -117,7 +116,7 @@ best_val_loss = 1e10
 for i in range(N_EPOCHS):
     epoch_loss = 0.0
     for batch in train_dl:
-        loss_val = feed_batch_get_loss(net, opt, batch)
+        loss_val = feed_batch_get_loss(net, opt, batch, clip_norm_threshold=expr.clip_norm_threshold)
         epoch_loss += loss_val
 
     val_loss = 0.0
