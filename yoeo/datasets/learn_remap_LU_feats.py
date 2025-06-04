@@ -57,26 +57,38 @@ def apply(mlp: Model, hr_feats: torch.Tensor) -> torch.Tensor:
 
 
 def vis(
-    save_path: str, img: Image.Image | None, lr_feats: torch.Tensor, hr_feats: torch.Tensor, remapped: torch.Tensor
+    save_path: str,
+    img: Image.Image | None,
+    lr_feats: torch.Tensor,
+    hr_feats: torch.Tensor,
+    remapped: torch.Tensor | None,
+    save_hr_separate_as_well: bool = False,
 ):
     lr_feats_np = lr_feats.cpu()[0].numpy()
     hr_feats_np = hr_feats.cpu()[0].numpy()
-    res_2D_np = remapped.detach().cpu()[0].numpy()
 
     lr_feats_red = do_2D_pca(lr_feats_np, 3, post_norm="minmax")
     hr_feats_red = do_2D_pca(hr_feats_np, 3, post_norm="minmax")
-    res_feats_red = do_2D_pca(res_2D_np, 3, post_norm="minmax")
 
-    _, axs = plt.subplots(ncols=4)
+    n_cols = 4 if remapped is not None else 3
+
+    _, axs = plt.subplots(ncols=n_cols, figsize=(n_cols * 10, 10))
     axs[0].imshow(img)
     axs[1].imshow(lr_feats_red)
     axs[2].imshow(hr_feats_red)
-    axs[3].imshow(res_feats_red)
+    if remapped is not None:
+        res_2D_np = remapped.detach().cpu()[0].numpy()
+        res_feats_red = do_2D_pca(res_2D_np, 3, post_norm="minmax")
+        axs[3].imshow(res_feats_red)
 
     for ax in axs:
         ax.set_axis_off()
-
+    plt.tight_layout()
     plt.savefig(save_path, bbox_inches="tight")
+
+    if save_hr_separate_as_well:
+        sep_path = save_path.split(".")[0] + "_hr.png"
+        plt.imsave(sep_path, hr_feats_red)
 
 
 # if __name__ == "__main__":
