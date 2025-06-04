@@ -1,5 +1,6 @@
 # threetures
 
+
 ## Notes 26/09/24;
 - most models bottom out around 15-17k loss (L2 or smooth L1)
 - can get high res but poor semantics or better semantics and blurring
@@ -156,6 +157,21 @@
 - gen embeddings for dv2 with registers
 - reworked into module structure
 - started working on propagator
+
+
+## Notes 1/0625:
+- denoiser is messing things up: disable for embed gen
+- could try:
+    - during train apply MLP/linear, then downsample, then measure loss
+
+## Notes 28/05/25:
+- try making Dv2 targ for lu remapping MLP slightly higher res (stride or pixel shifts)
+    - will hopefully reduce blur in gt -> reduce blur from net
+
+
+
+## Notes 4/06/25:
+- try making arch smaller? i,e contract feats to lower dims (128) at start then expand at last layer
 
 ## Model:
 

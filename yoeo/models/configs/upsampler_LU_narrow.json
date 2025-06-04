@@ -4,9 +4,10 @@
         "type": "combined",
         "k": 3,
         "n_ch_in": 384,
+        "n_ch_hidden": 96,
         "n_ch_out": 384,
         "n_ch_guidance": 3,
-        "n_ch_downsampler": 64,
+        "n_ch_downsampler": 32,
         "feat_weight": -1,
         "patch_size": 14,
         "padding_mode": "replicate"
@@ -33,8 +34,9 @@
         "lr": 1e-3,
         "clip_norm_threshold": 1.0,
         "weight_decay": 1e-5,
-        "batch_size": 32,
+        "batch_size": 48,
         "n_epochs": 1000,
-        "save_per": 2
+        "save_per": 2,
+        "weights_init": "ones"
     }
 }
