@@ -46,6 +46,7 @@ class Experiment:
     net_type: Literal["combined", "simple", "skips", "transfer"] = "combined"
     k: int = 3
     n_ch_in: int = 384
+    n_ch_hidden: int = -1
     n_ch_out: int = 128
     n_ch_guidance: int = 3
     n_ch_downsampler: int = 64
@@ -86,6 +87,12 @@ def expriment_from_json(json_obj_or_path: dict | str) -> Experiment:
     config.pop("type")
 
     return Experiment(**config)
+
+
+def get_n_params(net: nn.Module) -> int:
+    model_parameters = filter(lambda p: p.requires_grad, net.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    return int(params)
 
 
 # ========================= UPGRADES =========================
