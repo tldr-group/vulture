@@ -1,3 +1,4 @@
+from cProfile import label
 import torch
 import numpy as np
 from PIL import Image
@@ -132,6 +133,7 @@ def train_model_over_images(
     K: int = K_TRUNCATE,
     merge_small_class: bool = False,
     baseline_addition: BaselineAdditions = None,
+    overwrite_with_gt: bool = False,
 ) -> tuple[Classifier, object]:
     features: list[np.ndarray] | list[str] = []
     labels = []
@@ -149,6 +151,11 @@ def train_model_over_images(
         label_arr = load_labels(labels_path)
         if merge_small_class:
             label_arr = np.where(label_arr == 3, 2, label_arr)
+        if overwrite_with_gt:
+            seg_path = f"{path}/{dataset}/segmentations/{fname}.tif"
+            ground_truth = load_labels(seg_path)
+            ground_truth += 1
+            label_arr = np.where(label_arr > 0, ground_truth, label_arr)
         labels.append(label_arr)
 
         if feature_cache_paths is not None:
