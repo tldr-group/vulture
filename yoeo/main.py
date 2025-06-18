@@ -50,6 +50,7 @@ def get_upsampler_and_expr(
         expr.patch_size,
         n_ch_img=expr.n_ch_guidance,
         n_ch_in=expr.n_ch_in,
+        n_ch_deep=expr.n_ch_hidden,
         n_ch_out=expr.n_ch_out,
         n_ch_downsample=expr.n_ch_downsampler,
         k_up=expr.k,
@@ -71,7 +72,7 @@ def get_hr_feats(
     n_imgs_for_red: int = 50,
     n_ch_in: int = 64,
     n_batch_lr: int = 50,
-    existing_pca: PCAUnprojector | None = None
+    existing_pca: PCAUnprojector | None = None,
 ):
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image).convert("RGB")
@@ -95,7 +96,7 @@ def get_hr_feats(
         fit3d=fit_3d,
         n_feats_in=n_ch_in,
         n_batch=n_batch_lr,
-        existing_pca=existing_pca
+        existing_pca=existing_pca,
     )
     reduced_tensor = F.normalize(reduced_tensor, p=1, dim=1)
 

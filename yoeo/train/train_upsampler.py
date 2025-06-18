@@ -39,6 +39,7 @@ net = FeatureUpsampler(
     n_ch_in=expr.n_ch_in,
     n_ch_deep=expr.n_ch_hidden,
     n_ch_out=expr.n_ch_out,
+    n_ch_downsample=expr.n_ch_downsampler,
     feat_weight=expr.feat_weight,
 ).to(DEVICE)
 
