@@ -7,7 +7,7 @@
         "n_ch_out": 128,
         "n_ch_guidance": 3,
         "n_ch_downsampler": 64,
-        "feat_weight": 0.25,
+        "feat_weight": -1,
         "patch_size": 14,
         "padding_mode": "replicate"
     },
