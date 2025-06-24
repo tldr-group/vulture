@@ -1,11 +1,15 @@
 import torch
 import torch.nn as nn
-from os import listdir, path
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
+
+from os import listdir, path, makedirs
+from shutil import copyfile
 import time as time
 import numpy as np
 
 import segmentation_models_pytorch as smp
+from segmentation_models_pytorch import utils as smp_utils
 import pretrained_microscopy_models as pmm
 import albumentations as albu
 
@@ -180,10 +184,10 @@ def eval_miou(model: nn.Module, test_ds: pmm.io.Dataset, device: str = "cuda:0",
         gt_int_arr = np.zeros((h, w))
         pred_int_arr = np.zeros((h, w))
 
-        ch_init = 1 if is_sparse else 0
+        ch_init = 0  # 1 if is_sparse else 0
         for i in range(ch_init, n_ch + ch_init):
-            gt_int_arr = np.where(gt_mask[i - ch_init] != 0, i, gt_int_arr)
-            pred_int_arr = np.where(pr_mask[i - ch_init] != 0, i, pred_int_arr)
+            gt_int_arr = np.where(gt_mask[i] != 0, i, gt_int_arr)
+            pred_int_arr = np.where(pr_mask[i] != 0, i, pred_int_arr)
         preds.append(pred_int_arr)
         gts.append(gt_int_arr)
         miou = class_avg_mious(pred_int_arr, gt_int_arr)
@@ -198,12 +202,14 @@ def iteratively_train_cnn(
     loss,
     class_values: dict[str, list[int]],
     n_epochs: int,
+    save_per: int = 10,
     save_fname: str = "UnetPlusPlus_resnet50_high_lr.pth.tar",
     pretrained_weights: str = "micronet",
     arch: str = "UnetPlusPlus",
     encoder: str = "resnet50",
     device: str = "cuda:0",
 ) -> tuple[dict[int, Any], Any]:
+    # TODO: this is stupid because of adam momemtum
     model = pmm.segmentation_training.create_segmentation_model(
         architecture=arch,
         encoder=encoder,
@@ -218,10 +224,7 @@ def iteratively_train_cnn(
     eval_result = None
     for i in range(n_epochs):
         model_state = model if i == 0 else state
-        if i > 0:
-            print(f"[{i:3d}/{n_epochs}] ({tot_time:.3f}): {eval_result['miou']:.4f}")
         #  TODO: we can mock the weight decay by manually decreasing LR in here
-
         t0 = time.time()
         state = pmm.segmentation_training.train_segmentation_model(
             model=model_state,
@@ -233,7 +236,7 @@ def iteratively_train_cnn(
             class_values=class_values,
             patience=30,
             device=device,
-            lr=1e-3,
+            lr=2e-4,
             batch_size=6,
             val_batch_size=6,
             save_folder="models",
@@ -242,10 +245,181 @@ def iteratively_train_cnn(
         )
         t1 = time.time()
         tot_time += t1 - t0
+        # problem: only the state is being changed here, not the model
 
-        model.load_state_dict(pmm.util.remove_module_from_state_dict(state["state_dict"]))
-        eval_result = eval_miou(model, val_ds, device, is_sparse)
-        eval_result["time"] = t1 - t0
-        eval_result["tot_time"] = tot_time
-        results.append(eval_result)
+        if i % save_per == 0:
+            model.load_state_dict(pmm.util.remove_module_from_state_dict(state["state_dict"]))
+            eval_result = eval_miou(model, val_ds, device, is_sparse)
+            eval_result["time"] = t1 - t0
+            eval_result["tot_time"] = tot_time
+            eval_result["epoch"] = i
+            results.append(eval_result)
+
+            print(f"[{i:3d}/{n_epochs}] ({tot_time:.3f}): {eval_result['miou']:.4f}")
     return results, state
+
+
+def train_segmentation_model_with_eval(
+    model: nn.Module | dict | str,
+    architecture: str,
+    encoder: str,
+    train_dataset: pmm.io.Dataset,
+    validation_dataset: pmm.io.Dataset,
+    class_values: dict[str, list[int]],
+    n_classes: int = 3,
+    loss=None,
+    epochs: int | None = None,
+    save_per: int = 10,
+    patience: int = 30,
+    device: str = "cuda",
+    lr: float = 2e-4,
+    lr_decay: float = 0.00,
+    batch_size: int = 20,
+    val_batch_size: int = 12,
+    num_workers: int = 0,
+    save_folder="./",
+    save_name: str | None = None,
+    multi_gpu: bool = False,
+):
+    # setup and check parameters
+    assert len(class_values) != 2, "Two classes is binary classification.  Just specify the posative class value."
+    assert patience is not None or epochs is not None, "Need to set patience or epochs to define a stopping point."
+    epochs = 1e10 if epochs is None else epochs  # this will basically never be reached.
+    patience = 1e10 if patience is None else patience  # this will basically never be reached.
+
+    # load or create model
+    # TODO need to reload the optimizer.
+    if type(model) is dict:  # passed the state back for restarting
+        state = model  # load state dictionary
+        architecture = state["architecture"]
+        encoder = state["encoder"]
+        # create empty model
+        model = pmm.segmentation_training.create_segmentation_model(architecture, encoder, None, n_classes)
+        # load saved weights
+        model.load_state_dict(util.remove_module_from_state_dict(state["state_dict"]))
+    elif type(model) is str:  # passed saved model state for restarting
+        state = torch.load(model, weights_only=False)
+        architecture = state["architecture"]
+        encoder = state["encoder"]
+        model = pmm.segmentation_training.create_segmentation_model(architecture, encoder, None, n_classes)
+        model.load_state_dict(util.remove_module_from_state_dict(state["state_dict"]))
+    else:  # Fresh PyTorch model for segmentation
+        state = {
+            "architecture": architecture,
+            "encoder": encoder,
+            "train_loss": [],
+            "valid_loss": [],
+            "train_iou": [],
+            "valid_iou": [],
+            "max_score": 0,
+            "class_values": class_values,
+        }
+
+    if not path.exists(save_folder):
+        makedirs(save_folder)
+
+    if multi_gpu:
+        model = torch.nn.DataParallel(model).cuda()
+
+    # create training dataloaders
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True
+    )
+    valid_loader = DataLoader(
+        validation_dataset, batch_size=val_batch_size, shuffle=False, num_workers=num_workers, pin_memory=True
+    )
+
+    loss = pmm.losses.DiceBCELoss(weight=0.7) if loss is None else loss
+
+    # metrics = [
+    #     smp_utils.metrics.IoU(threshold=0.5),
+    # ]
+    metrics = []
+
+    optimizer = torch.optim.Adam(
+        [
+            dict(params=model.parameters(), lr=lr),
+        ]
+    )
+
+    # create epoch runners
+    # it is a simple loop of iterating over dataloader`s samples
+    train_epoch = smp_utils.train.TrainEpoch(
+        model,
+        loss=loss,
+        metrics=metrics,
+        optimizer=optimizer,
+        device=device,
+        verbose=True,
+    )
+
+    valid_epoch = smp_utils.train.ValidEpoch(
+        model,
+        loss=loss,
+        metrics=metrics,
+        device=device,
+        verbose=True,
+    )
+
+    patience_step = 0
+    max_score = 0
+    best_epoch = 0
+    epoch = 0
+    is_sparse = len(list(class_values.keys())) == 4
+    tot_time = 0
+    results: list[dict] = []
+
+    t0 = time.time()
+
+    while True:
+        t = time.time() - t0
+        print(
+            "\nEpoch: {}, lr: {:0.8f}, time: {:0.2f} seconds, patience step: {}, best iou: {:0.4f}".format(
+                epoch, lr, t, patience_step, max_score
+            )
+        )
+        torch.cuda.synchronize("cuda")  # s.t time is accurate
+        t0 = time.time()
+        train_logs = train_epoch.run(train_loader)
+        valid_logs = valid_epoch.run(valid_loader)
+
+        # update the state
+        state["epoch"] = epoch + 1
+        state["state_dict"] = model.state_dict()
+        state["optimizer"] = optimizer.state_dict()
+        state["train_loss"].append(train_logs["DiceBCELoss"])
+        state["valid_loss"].append(valid_logs["DiceBCELoss"])
+        torch.cuda.synchronize("cuda")  # s.t time is accurate
+        t1 = time.time()
+
+        tot_time += t1 - t0
+
+        # save the model
+        torch.save(state, path.join(save_folder, "checkpoint.pth.tar"))
+
+        if epoch % save_per == 0:
+            eval_result = eval_miou(model, validation_dataset, device, is_sparse)
+            eval_result["time"] = t1 - t0
+            eval_result["tot_time"] = tot_time
+            eval_result["epoch"] = epoch
+            results.append(eval_result)
+
+            print(f"[{epoch:3d}/{epochs}] ({tot_time:.3f}): {eval_result['miou']:.4f}")
+
+        # Increment the epoch and decay the learning rate
+        epoch += 1
+        lr = optimizer.param_groups[0]["lr"] * (1 - lr_decay)
+        optimizer.param_groups[0]["lr"] = lr
+
+        if epoch >= epochs:
+            print("\n\nTraining done! Saving final model")
+            if save_name is not None:
+                copyfile(path.join(save_folder, "model_best.pth.tar"), path.join(save_folder, save_name))
+            return results, state
+
+        # Use early stopping if there has not been improvment in a while
+        if patience_step >= patience:
+            print("\n\nTraining done!  No improvement in {} epochs. Saving final model".format(patience))
+            if save_name is not None:
+                copyfile(path.join(save_folder, "model_best.pth.tar"), path.join(save_folder, save_name))
+            return results, state
