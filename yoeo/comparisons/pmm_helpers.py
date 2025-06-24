@@ -167,7 +167,9 @@ class MaskedDiceBCELoss(nn.Module):
         return Dice_BCE
 
 
-def eval_miou(model: nn.Module, test_ds: pmm.io.Dataset, device: str = "cuda:0", is_sparse: bool = True):
+def eval_miou(
+    model: nn.Module, test_ds: pmm.io.Dataset, device: str = "cuda:0", is_sparse: bool = True, save_preds: bool = False
+):
     mious = []
     preds, gts = [], []
     for n in range(len(test_ds)):
@@ -193,70 +195,10 @@ def eval_miou(model: nn.Module, test_ds: pmm.io.Dataset, device: str = "cuda:0",
         miou = class_avg_mious(pred_int_arr, gt_int_arr)
         mious.append(miou)
     miou = np.mean([np.mean(m) for m in mious])
-    return {"miou": miou, "class_mious": mious, "gts": gts, "preds": preds}
-
-
-def iteratively_train_cnn(
-    train_ds: pmm.io.Dataset,
-    val_ds: pmm.io.Dataset,
-    loss,
-    class_values: dict[str, list[int]],
-    n_epochs: int,
-    save_per: int = 10,
-    save_fname: str = "UnetPlusPlus_resnet50_high_lr.pth.tar",
-    pretrained_weights: str = "micronet",
-    arch: str = "UnetPlusPlus",
-    encoder: str = "resnet50",
-    device: str = "cuda:0",
-) -> tuple[dict[int, Any], Any]:
-    # TODO: this is stupid because of adam momemtum
-    model = pmm.segmentation_training.create_segmentation_model(
-        architecture=arch,
-        encoder=encoder,
-        encoder_weights=pretrained_weights,  # use encoder pre-trained on micronet
-        classes=3,  # secondary precipitates, tertiary precipitates, matrix
-    )
-    is_sparse = len(list(class_values.keys())) == 4
-
-    tot_time = 0
-    results: list[dict] = []
-    state = None
-    eval_result = None
-    for i in range(n_epochs):
-        model_state = model if i == 0 else state
-        #  TODO: we can mock the weight decay by manually decreasing LR in here
-        t0 = time.time()
-        state = pmm.segmentation_training.train_segmentation_model(
-            model=model_state,
-            loss=loss,
-            architecture=arch,
-            encoder=encoder,
-            train_dataset=train_ds,
-            validation_dataset=val_ds,
-            class_values=class_values,
-            patience=30,
-            device=device,
-            lr=2e-4,
-            batch_size=6,
-            val_batch_size=6,
-            save_folder="models",
-            epochs=1,
-            save_name=save_fname,
-        )
-        t1 = time.time()
-        tot_time += t1 - t0
-        # problem: only the state is being changed here, not the model
-
-        if i % save_per == 0:
-            model.load_state_dict(pmm.util.remove_module_from_state_dict(state["state_dict"]))
-            eval_result = eval_miou(model, val_ds, device, is_sparse)
-            eval_result["time"] = t1 - t0
-            eval_result["tot_time"] = tot_time
-            eval_result["epoch"] = i
-            results.append(eval_result)
-
-            print(f"[{i:3d}/{n_epochs}] ({tot_time:.3f}): {eval_result['miou']:.4f}")
-    return results, state
+    if save_preds:
+        return {"miou": miou, "class_mious": mious, "gts": gts, "preds": preds}
+    else:
+        return {"miou": miou, "class_mious": mious}
 
 
 def train_segmentation_model_with_eval(
@@ -398,7 +340,7 @@ def train_segmentation_model_with_eval(
         torch.save(state, path.join(save_folder, "checkpoint.pth.tar"))
 
         if epoch % save_per == 0:
-            eval_result = eval_miou(model, validation_dataset, device, is_sparse)
+            eval_result = eval_miou(model, validation_dataset, device, is_sparse, epoch >= epochs)
             eval_result["time"] = t1 - t0
             eval_result["tot_time"] = tot_time
             eval_result["epoch"] = epoch
@@ -423,3 +365,66 @@ def train_segmentation_model_with_eval(
             if save_name is not None:
                 copyfile(path.join(save_folder, "model_best.pth.tar"), path.join(save_folder, save_name))
             return results, state
+
+
+# def iteratively_train_cnn(
+#     train_ds: pmm.io.Dataset,
+#     val_ds: pmm.io.Dataset,
+#     loss,
+#     class_values: dict[str, list[int]],
+#     n_epochs: int,
+#     save_per: int = 10,
+#     save_fname: str = "UnetPlusPlus_resnet50_high_lr.pth.tar",
+#     pretrained_weights: str = "micronet",
+#     arch: str = "UnetPlusPlus",
+#     encoder: str = "resnet50",
+#     device: str = "cuda:0",
+# ) -> tuple[dict[int, Any], Any]:
+#     # TODO: this is stupid because of adam momemtum
+#     model = pmm.segmentation_training.create_segmentation_model(
+#         architecture=arch,
+#         encoder=encoder,
+#         encoder_weights=pretrained_weights,  # use encoder pre-trained on micronet
+#         classes=3,  # secondary precipitates, tertiary precipitates, matrix
+#     )
+#     is_sparse = len(list(class_values.keys())) == 4
+
+#     tot_time = 0
+#     results: list[dict] = []
+#     state = None
+#     eval_result = None
+#     for i in range(n_epochs):
+#         model_state = model if i == 0 else state
+#         #  TODO: we can mock the weight decay by manually decreasing LR in here
+#         t0 = time.time()
+#         state = pmm.segmentation_training.train_segmentation_model(
+#             model=model_state,
+#             loss=loss,
+#             architecture=arch,
+#             encoder=encoder,
+#             train_dataset=train_ds,
+#             validation_dataset=val_ds,
+#             class_values=class_values,
+#             patience=30,
+#             device=device,
+#             lr=2e-4,
+#             batch_size=6,
+#             val_batch_size=6,
+#             save_folder="models",
+#             epochs=1,
+#             save_name=save_fname,
+#         )
+#         t1 = time.time()
+#         tot_time += t1 - t0
+#         # problem: only the state is being changed here, not the model
+
+#         if i % save_per == 0:
+#             model.load_state_dict(pmm.util.remove_module_from_state_dict(state["state_dict"]))
+#             eval_result = eval_miou(model, val_ds, device, is_sparse)
+#             eval_result["time"] = t1 - t0
+#             eval_result["tot_time"] = tot_time
+#             eval_result["epoch"] = i
+#             results.append(eval_result)
+
+#             print(f"[{i:3d}/{n_epochs}] ({tot_time:.3f}): {eval_result['miou']:.4f}")
+#     return results, state

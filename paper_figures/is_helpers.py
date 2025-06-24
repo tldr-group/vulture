@@ -134,6 +134,7 @@ def train_model_over_images(
     merge_small_class: bool = False,
     baseline_addition: BaselineAdditions = None,
     overwrite_with_gt: bool = False,
+    reveal_all: bool = False,
 ) -> tuple[Classifier, object]:
     features: list[np.ndarray] | list[str] = []
     labels = []
@@ -156,6 +157,12 @@ def train_model_over_images(
             ground_truth = load_labels(seg_path)
             ground_truth += 1
             label_arr = np.where(label_arr > 0, ground_truth, label_arr)
+        if reveal_all:
+            seg_path = f"{path}/{dataset}/segmentations/{fname}.tif"
+            ground_truth = load_labels(seg_path)
+            ground_truth += 1
+            label_arr = ground_truth
+
         labels.append(label_arr)
 
         if feature_cache_paths is not None:
