@@ -340,7 +340,7 @@ def train_segmentation_model_with_eval(
         torch.save(state, path.join(save_folder, "checkpoint.pth.tar"))
 
         if epoch % save_per == 0:
-            eval_result = eval_miou(model, validation_dataset, device, is_sparse, epoch >= epochs)
+            eval_result = eval_miou(model, validation_dataset, device, is_sparse, epoch >= (epochs - 3))
             eval_result["time"] = t1 - t0
             eval_result["tot_time"] = tot_time
             eval_result["epoch"] = epoch
