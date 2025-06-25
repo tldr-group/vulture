@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+import numpy as np
 
 from PIL import Image
 
@@ -56,6 +57,13 @@ def apply(mlp: Model, hr_feats: torch.Tensor) -> torch.Tensor:
     return res_2D
 
 
+def rescale(a: np.ndarray) -> np.ndarray:
+    a_min = a.min(axis=(0, 1), keepdims=True)
+    a_max = a.max(axis=(0, 1), keepdims=True)
+    out = (a - a_min) / (a_max - a_min)
+    return out
+
+
 def vis(
     save_path: str,
     img: Image.Image | None,
@@ -63,12 +71,19 @@ def vis(
     hr_feats: torch.Tensor,
     remapped: torch.Tensor | None,
     save_hr_separate_as_well: bool = False,
+    is_featup: bool = False,
 ):
-    lr_feats_np = lr_feats.cpu()[0].numpy()
-    hr_feats_np = hr_feats.cpu()[0].numpy()
+    lr_feats_np = lr_feats.cpu()[0].numpy().astype(np.float32)
+    hr_feats_np = hr_feats.cpu()[0].numpy().astype(np.float32)
 
-    lr_feats_red = do_2D_pca(lr_feats_np, 3, post_norm="minmax")
-    hr_feats_red = do_2D_pca(hr_feats_np, 3, post_norm="minmax")
+    if is_featup:
+        lr_feats_red = lr_feats_np.transpose((1, 2, 0))[:, :, 0:3]
+        lr_feats_red = rescale(lr_feats_red)
+        hr_feats_red = hr_feats_np.transpose((1, 2, 0))[:, :, 0:3]
+        hr_feats_red = rescale(hr_feats_red)
+    else:
+        lr_feats_red = do_2D_pca(lr_feats_np, 3, post_norm="minmax")
+        hr_feats_red = do_2D_pca(hr_feats_np, 3, post_norm="minmax")
 
     n_cols = 4 if remapped is not None else 3
 
