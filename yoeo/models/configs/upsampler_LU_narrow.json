@@ -31,12 +31,12 @@
     "training": {
         "loss": "smooth_l1",
         "optim": "adamw",
-        "lr": 1e-3,
+        "lr": 1e-4,
         "clip_norm_threshold": 1.0,
-        "weight_decay": 1e-5,
-        "batch_size": 48,
-        "n_epochs": 1000,
-        "save_per": 2,
+        "weight_decay": 0.0,
+        "batch_size": 32,
+        "n_epochs": 5000,
+        "save_per": 6,
         "weights_init": "ones"
     }
 }
