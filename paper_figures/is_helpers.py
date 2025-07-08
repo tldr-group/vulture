@@ -84,7 +84,7 @@ def get_pca_over_images_or_dir(
         tensor = convert_image(img, tr, device_str=DEVICE)
         img_tensors.append(tensor)
 
-    _, pca = get_lr_feats(dv2, img_tensors, n_imgs=500, fit3d=True)
+    _, pca = get_lr_feats(dv2, img_tensors, n_imgs=100, n_batch=100, fit3d=True)
     return pca
 
 
