@@ -5,6 +5,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
+from random import seed
+
 import numpy as np
 from time import time_ns
 
@@ -17,9 +19,15 @@ from yoeo.datasets.learn_remap_LU_feats import vis
 torch.backends.cudnn.enabled = True
 torch.cuda.empty_cache()
 
-DEVICE = "cuda:0"
 
-dv2 = get_dv2_model(True, to_half=False, add_flash=False, device=DEVICE)
+SEED = 10672
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+seed(SEED)
+
+DEVICE = "cuda:1"
+
+dv2 = get_dv2_model(True, to_half=True, add_flash=True, device=DEVICE)
 # dv2 = get_dv2_model(True, to_half=False, add_flash=False, device=DEVICE)
 dv2 = dv2.to(DEVICE)
 
@@ -33,6 +41,10 @@ denoiser.load_state_dict(denoiser_weights["denoiser"])
 model_path = "trained_models/e5000_full_fit_reg.pth"
 cfg_path = "yoeo/models/configs/combined_no_shift.json"
 
+# model_path = "trained_models/e5000_fit_reg_f32.pth"
+# model_path = "experiments/current/best.pth"
+# cfg_path = "yoeo/models/configs/upsampler_FU_ch32.json"
+
 # model_path = "trained_models/e5000_fit_reg_f64.pth"
 # cfg_path = "yoeo/models/configs/upsampler_fewer_features.json"
 
@@ -43,7 +55,7 @@ cfg_path = "yoeo/models/configs/combined_no_shift.json"
 upsampler, expr = get_upsampler_and_expr(model_path, cfg_path, device=DEVICE)
 upsampler = upsampler
 
-path = "data/compare/bar.JPEG"
+path = "data/compare/394.jpg"
 img = Image.open(path).convert("RGB")
 # img = img.resize((img.width // 2, img.height // 2))
 
@@ -59,7 +71,7 @@ inp_img = (
     .unsqueeze(0)
     .to(DEVICE)
 )
-inp_img_dino = convert_image(img, tr, to_half=False, device_str=DEVICE)
+inp_img_dino = convert_image(img, tr, to_half=True, device_str=DEVICE)
 # print(inp_img_dino.shape)
 
 torch.cuda.reset_peak_memory_stats(DEVICE)  # s.t memory is accurate
@@ -82,18 +94,22 @@ t0 = time_ns()
 
 with torch.no_grad():
     # lr_feats = project(inp_img_dino, dv2, fit3d=False)
+    print("t0")
     lr_feats, _ = get_lr_feats(dv2, [inp_img_dino], 50, fit3d=True, n_feats_in=expr.n_ch_in)
     lr_feats = lr_feats.to(DEVICE)
+    print("t1")
     # lr_feats = F.normalize(lr_feats, p=1, dim=1)
 
     # lr_feats = lr_feats.permute((0, 2, 3, 1))
     # lr_feats = denoiser.forward(lr_feats, return_channel_first=True)
 
     lr_feats = F.normalize(lr_feats, p=1, dim=1)
-    lr_feats = lr_feats.to(torch.float16)
-    inp_img = inp_img.to(torch.float16)
+    # lr_feats = lr_feats.to(torch.float16)
+    # inp_img = inp_img.to(torch.float16)
+    print("t2")
     with torch.autocast(DEVICE, torch.float16):
         hr_feats = upsampler(inp_img, lr_feats)
+    print("t3")
 
 torch.cuda.synchronize(DEVICE)  # s.t time is accurate
 t1 = time_ns()
