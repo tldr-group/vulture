@@ -1,10 +1,13 @@
 import numpy as np
+from yoeo.comparisons.autoencoder import get_autoencoder
 from yoeo.comparisons.loftup.upsamplers import norm
 from yoeo.comparisons.loftup.featurizers import get_featurizer
 
+from yoeo.comparisons.online_denoiser import Denoiser
 from yoeo.datasets.learn_remap_LU_feats import train, apply, vis
 
 import torch
+import torch.nn.functional as F
 import torchvision.transforms as T
 
 from datasets import load_dataset
@@ -28,6 +31,12 @@ torch_hub_name = "loftup_dinov2s_reg"
 
 model, patch_size, dim = get_featurizer(featurizer_class)
 model = model.to(DEVICE)
+
+denoiser = Denoiser(feat_dim=384).to(DEVICE)
+denoiser_weights = torch.load("yoeo/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
+denoiser.load_state_dict(denoiser_weights["denoiser"])
+
+autoencoder = get_autoencoder("trained_models/dac_dv2_denoised_e500.pth", DEVICE)
 
 
 kernel_size = patch_size
@@ -57,15 +66,20 @@ if __name__ == "__main__":
         normalized_img_tensor = transform(pil_img).unsqueeze(0).to(DEVICE)
         with torch.no_grad():
             lr_feats = model(normalized_img_tensor)
+            lr_feats = lr_feats.permute((0, 2, 3, 1))
+            lr_feats = denoiser.forward(lr_feats, return_channel_first=True)
             hr_feats = upsampler(lr_feats, normalized_img_tensor)  # 1, dim, 224, 224
 
+            compressed_lr = autoencoder.encoder(F.normalize(lr_feats, p=1, dim=1))
+            compressed_hr = autoencoder.encoder(F.normalize(hr_feats, p=1, dim=1))
+
         if REMAP:
-            mlp = train(hr_feats, lr_feats, 2000, 1e-3, device=DEVICE)
+            mlp = train(compressed_hr, compressed_lr, 5000, 1e-4, device=DEVICE, n_dims=48)
             with torch.no_grad():
-                remapped_hr_feats = apply(mlp, hr_feats)
+                remapped_hr_feats = apply(mlp, compressed_hr)
 
         data = {
-            "lr_feats": lr_feats,
+            "lr_feats": compressed_lr,
             "dv2_lr_feats": lr_feats,
             "hr_feats": remapped_hr_feats,
         }
@@ -75,7 +89,8 @@ if __name__ == "__main__":
 
         if i % 50 == 0:
             print(f"[{i:05d}/{N_CUTOFF}] in {end_t - start_t:03f}s")
-            vis(f"tmp/remap/remap_{i}.png", pil_img, lr_feats, hr_feats, remapped_hr_feats)
+            print(compressed_lr.shape, remapped_hr_feats.shape)
+            vis(f"tmp/remap/remap_{i}.png", pil_img, compressed_lr, hr_feats, remapped_hr_feats)
         if i == N_CUTOFF:
             break
 
