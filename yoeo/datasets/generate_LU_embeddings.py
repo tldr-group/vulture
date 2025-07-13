@@ -74,7 +74,7 @@ if __name__ == "__main__":
             compressed_hr = autoencoder.encoder(F.normalize(hr_feats, p=1, dim=1))
 
         if REMAP:
-            mlp = train(compressed_hr, compressed_lr, 5000, 1e-4, device=DEVICE, n_dims=48)
+            mlp = train(compressed_hr, compressed_lr, 3000, 1e-3, device=DEVICE, n_dims=48)
             with torch.no_grad():
                 remapped_hr_feats = apply(mlp, compressed_hr)
 

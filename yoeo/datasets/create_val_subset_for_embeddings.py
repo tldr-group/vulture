@@ -1,10 +1,11 @@
-from random import shuffle
+from random import shuffle, seed
 from os import listdir
 from shutil import move
 
-N_VAL = 150
-input_dir = "data/imagenet_reduced/data_reg"
-target_dir = "data/imagenet_reduced/val_reg"
+seed(1025)
+N_VAL = 500
+input_dir = "data/imagenet_reduced/data_lu_reg"
+target_dir = "data/imagenet_reduced/val_lu_reg"
 if __name__ == "__main__":
     all_data = listdir(input_dir)
     # sample without replacement

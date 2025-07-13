@@ -50,7 +50,7 @@ def train(
         total_loss += loss.item()
 
         if verbose:
-            print(f"Epoch {epoch + 1}/{epochs} - Loss: {total_loss:.4f}")
+            print(f"Epoch {epoch + 1}/{epochs} - Loss: {total_loss:.5f}")
 
     return model
 
@@ -114,65 +114,66 @@ if __name__ == "__main__":
     PATH = "data/imagenet_reduced"
     DATA_FOLDER = "data_lu_reg"
 
-    fname = "00241"
+    for i in range(0, 30):
+        fname = f"00{240 + i}"
 
-    DEVICE = "cuda:1"
+        DEVICE = "cuda:1"
 
-    featurizer_class = "dinov2s_reg"
-    torch_hub_name = "loftup_dinov2s_reg"
+        featurizer_class = "dinov2s_reg"
+        torch_hub_name = "loftup_dinov2s_reg"
 
-    model, patch_size, dim = get_featurizer(featurizer_class)
-    model = model.to(DEVICE)
+        model, patch_size, dim = get_featurizer(featurizer_class)
+        model = model.to(DEVICE)
 
-    kernel_size = patch_size
-    lr_size = 224 // patch_size  # 2 * 224 // patch_size
-    load_size = 224
+        kernel_size = patch_size
+        lr_size = 224 // patch_size  # 2 * 224 // patch_size
+        load_size = 224
 
-    upsampler = torch.hub.load("andrehuang/loftup", torch_hub_name, pretrained=True)
-    upsampler = upsampler.to(DEVICE).eval()
+        upsampler = torch.hub.load("andrehuang/loftup", torch_hub_name, pretrained=True)
+        upsampler = upsampler.to(DEVICE).eval()
 
-    denoiser = Denoiser(feat_dim=384).to(DEVICE)
-    denoiser_weights = torch.load("yoeo/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
-    denoiser.load_state_dict(denoiser_weights["denoiser"])
+        denoiser = Denoiser(feat_dim=384).to(DEVICE)
+        denoiser_weights = torch.load("yoeo/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
+        denoiser.load_state_dict(denoiser_weights["denoiser"])
 
-    autoencoder = get_autoencoder("trained_models/dac_dv2_denoised_e500.pth", DEVICE)
+        autoencoder = get_autoencoder("trained_models/dac_dv2_denoised_e500.pth", DEVICE)
 
-    img = Image.open(f"{PATH}/imgs/{fname}.png")
-    data = torch.load(f"{PATH}/{DATA_FOLDER}/{fname}.pt")
+        img = Image.open(f"{PATH}/imgs/{fname}.png")
+        # data = torch.load(f"{PATH}/{DATA_FOLDER}/{fname}.pt")
 
-    MU, SIGMA = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
-    to_norm_tensor = T.Compose(
-        [
-            T.ToTensor(),
-            T.Normalize(mean=MU, std=SIGMA),
-        ]
-    )
+        MU, SIGMA = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+        to_norm_tensor = T.Compose(
+            [
+                T.ToTensor(),
+                T.Normalize(mean=MU, std=SIGMA),
+            ]
+        )
 
-    transform = T.Compose(
-        [
-            T.Resize(load_size, T.InterpolationMode.BILINEAR),
-            T.CenterCrop(load_size),  # Depending on whether you want a center crop
-            to_norm_tensor,
-        ]
-    )
+        transform = T.Compose(
+            [
+                T.Resize(load_size, T.InterpolationMode.BILINEAR),
+                T.CenterCrop(load_size),  # Depending on whether you want a center crop
+                to_norm_tensor,
+            ]
+        )
 
-    normalized_img_tensor = transform(img).unsqueeze(0).to(DEVICE)
-    with torch.no_grad():
-        lr_feats = model(normalized_img_tensor)
-        lr_feats = lr_feats.permute((0, 2, 3, 1))
-        lr_feats = denoiser.forward(lr_feats, return_channel_first=True)
-        hr_feats = upsampler(lr_feats, normalized_img_tensor)  # 1, dim, 224, 224
-        # lr_feats: torch.Tensor = data["lr_feats"].to(DEVICE)
-        # hr_feats: torch.Tensor = data["hr_feats"].to(DEVICE)
-        print(lr_feats.shape, hr_feats.shape)
+        normalized_img_tensor = transform(img).unsqueeze(0).to(DEVICE)
+        with torch.no_grad():
+            lr_feats = model(normalized_img_tensor)
+            lr_feats = lr_feats.permute((0, 2, 3, 1))
+            lr_feats = denoiser.forward(lr_feats, return_channel_first=True)
+            hr_feats = upsampler(lr_feats, normalized_img_tensor)  # 1, dim, 224, 224
+            # lr_feats: torch.Tensor = data["lr_feats"].to(DEVICE)
+            # hr_feats: torch.Tensor = data["hr_feats"].to(DEVICE)
+            print(lr_feats.shape, hr_feats.shape)
 
-        compressed_lr = autoencoder.encoder(F.normalize(lr_feats, p=1, dim=1))
-        compressed_hr = autoencoder.encoder(F.normalize(hr_feats, p=1, dim=1))
+            compressed_lr = autoencoder.encoder(F.normalize(lr_feats, p=1, dim=1))
+            compressed_hr = autoencoder.encoder(F.normalize(hr_feats, p=1, dim=1))
 
-    mlp = train(compressed_hr, compressed_lr, 5000, lr=1e-4, verbose=True, device=DEVICE, n_dims=48)
+        mlp = train(compressed_hr, compressed_lr, 3000, lr=1e-3, verbose=True, device=DEVICE, n_dims=48)
 
-    res = apply(mlp, compressed_hr)
-    # print(torch.sum(mlp.model.weight.data))
-    print(res.shape)
+        res = apply(mlp, compressed_hr)
+        # print(torch.sum(mlp.model.weight.data))
+        print(res.shape)
 
-    vis("tmp/better_better_remap.png", img, compressed_lr, hr_feats, res)
+        vis(f"tmp/remap_2/{i}.png", img, compressed_lr, hr_feats, res)

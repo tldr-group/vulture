@@ -18,7 +18,7 @@ DEVICE = "cuda:1"
 
 OUT_PATH = "experiments/current"
 
-expr_path = "yoeo/models/configs/upsampler_LU_narrow.json"
+expr_path = "yoeo/models/configs/upsampler_LU_compressed.json"
 expr = expriment_from_json(expr_path)
 copy(expr_path, f"{OUT_PATH}/config.json")
 print(expr)
