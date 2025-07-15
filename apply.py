@@ -26,9 +26,9 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 seed(SEED)
 
-DEVICE = "cuda:1"
+DEVICE = "cuda:0"
 
-dv2 = get_dv2_model(False, to_half=True, add_flash=True, device=DEVICE)
+dv2 = get_dv2_model(False, to_half=False, add_flash=False, device=DEVICE)
 # dv2 = get_dv2_model(True, to_half=False, add_flash=False, device=DEVICE)
 dv2 = dv2.to(DEVICE)
 
@@ -60,9 +60,9 @@ model_path = "experiments/current/best.pth"
 cfg_path = "yoeo/models/configs/upsampler_LU_compressed.json"
 
 upsampler, expr = get_upsampler_and_expr(model_path, cfg_path, device=DEVICE)
-upsampler = upsampler
+upsampler = upsampler.eval()
 
-path = "data/compare/needle_block.jpg"
+path = "data/compare/accom.png"
 img = Image.open(path).convert("RGB")
 # img = img.resize((img.width // 2, img.height // 2))
 
@@ -78,7 +78,7 @@ inp_img = (
     .unsqueeze(0)
     .to(DEVICE)
 )
-inp_img_dino = convert_image(img, tr, to_half=True, device_str=DEVICE)
+inp_img_dino = convert_image(img, tr, to_half=False, device_str=DEVICE)
 # print(inp_img_dino.shape)
 
 torch.cuda.reset_peak_memory_stats(DEVICE)  # s.t memory is accurate
@@ -112,7 +112,8 @@ with torch.no_grad():
     lr_feats = autoencoder.encoder(lr_feats)
     # lr_feats = lr_feats.to(torch.float16)
     # inp_img = inp_img.to(torch.float16)
-    with torch.autocast(DEVICE, torch.float16):
+    lr_feats = F.normalize(lr_feats, p=1, dim=1)
+    with torch.autocast(DEVICE, torch.float32):
         hr_feats = upsampler(inp_img, lr_feats)
 
 torch.cuda.synchronize(DEVICE)  # s.t time is accurate
