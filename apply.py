@@ -28,7 +28,7 @@ seed(SEED)
 
 DEVICE = "cuda:0"
 
-dv2 = get_dv2_model(False, to_half=False, add_flash=False, device=DEVICE)
+dv2 = get_dv2_model(False, to_half=True, add_flash=True, device=DEVICE)
 # dv2 = get_dv2_model(True, to_half=False, add_flash=False, device=DEVICE)
 dv2 = dv2.to(DEVICE)
 
@@ -62,7 +62,7 @@ cfg_path = "yoeo/models/configs/upsampler_LU_compressed.json"
 upsampler, expr = get_upsampler_and_expr(model_path, cfg_path, device=DEVICE)
 upsampler = upsampler.eval()
 
-path = "data/compare/accom.png"
+path = "data/large/000393.jpg"
 img = Image.open(path).convert("RGB")
 # img = img.resize((img.width // 2, img.height // 2))
 
@@ -78,7 +78,7 @@ inp_img = (
     .unsqueeze(0)
     .to(DEVICE)
 )
-inp_img_dino = convert_image(img, tr, to_half=False, device_str=DEVICE)
+inp_img_dino = convert_image(img, tr, to_half=True, device_str=DEVICE)
 # print(inp_img_dino.shape)
 
 torch.cuda.reset_peak_memory_stats(DEVICE)  # s.t memory is accurate

@@ -79,6 +79,7 @@ def vis(
 ):
     lr_feats_np = lr_feats.cpu()[0].numpy().astype(np.float32)
     hr_feats_np = hr_feats.cpu()[0].numpy().astype(np.float32)
+    hr_feats_np = np.nan_to_num(hr_feats_np, 0)
 
     if is_featup:
         lr_feats_red = lr_feats_np.transpose((1, 2, 0))[:, :, 0:3]
