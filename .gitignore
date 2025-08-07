@@ -183,3 +183,5 @@ tmp/*
 paper_figures/fig_data
 paper_figures/fig_outds
 paper_figures/models/
+
+old

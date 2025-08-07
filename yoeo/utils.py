@@ -334,7 +334,7 @@ def rescale(a: np.ndarray) -> np.ndarray:
 
 # put vis code in here
 def vis(
-    save_path: str,
+    save_path: str | None,
     img: Image.Image | None,
     lr_feats: torch.Tensor,
     hr_feats: torch.Tensor,
@@ -369,9 +369,11 @@ def vis(
     for ax in axs:
         ax.set_axis_off()
     plt.tight_layout()
-    plt.savefig(save_path, bbox_inches="tight")
 
-    if save_hr_separate_as_well:
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight")
+
+    if save_hr_separate_as_well and save_path is not None:
         sep_path = save_path.split(".")[0] + "_hr.png"
         plt.imsave(sep_path, hr_feats_red)
 
