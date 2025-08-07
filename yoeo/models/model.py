@@ -7,8 +7,6 @@ from yoeo.models.layers import DoubleConv, Up, Down
 import torch.utils.benchmark as benchmark
 from yoeo.utils import measure_mem_time, get_n_params
 
-torch.backends.cudnn.benchmark = False
-
 import numpy as np
 from math import log2, floor, ceil
 
@@ -160,105 +158,20 @@ class FeatureUpsampler(nn.Module):
         return self.upsampler(lr_feats, downsamples)
 
 
-class SimpleConv(nn.Module):
-    def __init__(
-        self,
-        n_ch_in: int = 128,
-        n_ch_out: int = 128,
-        n_ch_guidance: int = 64,
-        n_convs: int = 4,
-        k: int = 3,
-        contractive: bool = True,
-        padding_mode: str = "zeros",
-    ):
-        super().__init__()
-
-        ch_vals: list[int] | np.ndarray
-        if contractive:
-            ch_vals = np.linspace(
-                n_ch_guidance + n_ch_in,
-                n_ch_out,
-                n_convs + 1,
-                endpoint=True,
-                dtype=np.int32,
-            )
-            ch_vals = [int(i) for i in ch_vals]
-        else:
-            ch_vals = [n_ch_out for i in range(n_convs + 1)]
-
-        self.in_conv = nn.Conv2d(n_ch_guidance + n_ch_in, ch_vals[0], k, padding=floor(k / 2))
-        layers: list[nn.Module] = []
-        for i in range(1, n_convs + 1):
-            layers.append(DoubleConv(ch_vals[i - 1], ch_vals[i], k=k))
-        self.layers = nn.ModuleList(layers)
-
-        self.outp_conv = nn.Conv2d(n_ch_out, n_ch_out, 3, padding=1, padding_mode=padding_mode)
-        self.mlp = nn.Conv2d(n_ch_out, n_ch_out, 1)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.in_conv(x)
-        for l in self.layers:
-            x = l(x)
-        x = self.outp_conv(x)  # no LRELU
-        x = self.mlp(x)
-        return x
-
-
-class FeaturePropagator(nn.Module):
-    def __init__(
-        self,
-        patch_size: int,
-        n_ch_imgs: int = 6,
-        n_ch_in: int = 128,
-        n_ch_out: int = 128,
-        n_ch_downsample: int = 64,
-        k: int | list[int] = 3,
-        k_down: int | list[int] = 3,
-        n_layers: int = 5,
-        padding_mode: str = "zeros",
-    ):
-        super().__init__()
-        self.patch_size = patch_size
-        self.downsampler = LearnedDownsampler(
-            patch_size,
-            n_ch_imgs,
-            n_ch_downsample,
-            n_ch_guidance=n_ch_imgs,
-            k=k_down,
-            padding_mode=padding_mode,
-        )
-        self.feature_adjuster = SimpleConv(
-            n_ch_in,
-            n_ch_out,
-            n_ch_downsample + n_ch_imgs,
-            n_layers,
-            k,
-            True,
-            padding_mode=padding_mode,
-        )
-
-    def forward(self, f0: torch.Tensor, i0: torch.Tensor, i1: torch.Tensor) -> torch.Tensor:
-        combined_imgs = torch.cat((i0, i1), dim=1)  # (B, 2C, H, W)
-        guidance_from_image_features = self.downsampler.forward(combined_imgs)[-1]
-        input_feats = torch.cat((f0, guidance_from_image_features), dim=1)
-        f1 = self.feature_adjuster.forward(input_feats)
-        return f1
-
-
-def test_benchmark():
-    l = 1400
+def test_benchmark() -> None:
+    image_l = 1400
     test_down_str = f"""
                 from __main__ import LearnedDownsampler
                 d = Downsampler(14).to('cuda:0')
-                test= torch.ones((1, 3, {l}, {l}), device='cuda:0')
+                test= torch.ones((1, 3, {image_l}, {image_l}), device='cuda:0')
                 """
 
     test_both_str = f"""
                 from __main__ import LearnedDownsampler, Upsampler
                 d = Downsampler(14).to('cuda:0')
                 u = Upsampler(14).to('cuda:0')
-                test= torch.ones((1, 3, {l}, {l}), device='cuda:0')
-                test_lr = torch.ones((1, 128, {l // 14}, {l // 14}), device='cuda:0')
+                test= torch.ones((1, 3, {image_l}, {image_l}), device='cuda:0')
+                test_lr = torch.ones((1, 128, {image_l // 14}, {image_l // 14}), device='cuda:0')
                 """
     t0 = benchmark.Timer(
         stmt="d(test)",

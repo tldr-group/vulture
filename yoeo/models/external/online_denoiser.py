@@ -1,3 +1,5 @@
+"""Taken from https://github.com/Jiawei-Yang/Denoising-ViT"""
+
 from functools import partial
 
 import torch
@@ -5,7 +7,7 @@ import torch.nn as nn
 from timm.layers import resample_abs_pos_embed
 from timm.models.vision_transformer import Block, Mlp
 
-from yoeo.comparisons.vit_wrapper import PretrainedViTWrapper
+from yoeo.models.external.vit_wrapper import PretrainedViTWrapper
 
 
 class Denoiser(nn.Module):
@@ -14,7 +16,7 @@ class Denoiser(nn.Module):
         noise_map_height: int = 37,
         noise_map_width: int = 37,
         feat_dim: int = 768,
-        vit: PretrainedViTWrapper = None,
+        vit: PretrainedViTWrapper | None = None,
         enable_pe: bool = True,
         num_blocks: int = 1,
     ):
