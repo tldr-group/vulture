@@ -98,19 +98,6 @@ def get_n_params(net: nn.Module) -> int:
 # ========================= UPGRADES =========================
 
 
-def init_weights(m: nn.Module, init: InitTypes):
-    if isinstance(m, nn.Linear):
-        if init == "unit":
-            torch.nn.init.constant_(m.weight, 1)
-        elif init == "zero":
-            torch.nn.init.constant_(m.weight, 0)
-        elif init == "xavier":
-            torch.nn.init.xavier_uniform(m.weight)
-            # m.bias.data.fill_(0.01)
-        else:
-            pass
-
-
 # ========================= PCA STUFF =========================
 def flatten(x: torch.Tensor | np.ndarray) -> np.ndarray:
     y: np.ndarray
@@ -243,7 +230,7 @@ def load_image(
 
 
 def convert_image(
-    img: Image.Image,
+    img: Image.Image | torch.Tensor,
     transform: transforms.Compose,
     to_gpu: bool = True,
     to_half: bool = True,

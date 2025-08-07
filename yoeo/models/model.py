@@ -176,6 +176,8 @@ class FeatureUpsampler(nn.Module):
     ):
         super().__init__()
 
+        self.n_ch_in = n_ch_in
+        self.n_ch_out = n_ch_out
         self.downsampler = LearnedDownsampler(
             patch_size, n_ch_img, n_ch_downsample, k=k_down, padding_mode=padding_mode
         )

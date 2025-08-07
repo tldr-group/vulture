@@ -114,6 +114,7 @@ class PretrainedViTWrapper(nn.Module):
             self.model.patch_embed.dynamic_feat_size = MethodType(dynamic_feat_size, self.model.patch_embed)
 
         if add_flash_attn:
+            self.model = self.model.half()
             self.model = add_flash_attention(self.model)
 
         self.to(device)
