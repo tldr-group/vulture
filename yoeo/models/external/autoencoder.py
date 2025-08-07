@@ -9,7 +9,7 @@ Losses = Literal["MSE", "MAE"]
 
 
 @dataclass
-class Config:
+class AutoencoderConfig:
     name: str
     in_ch: int
     base_ch: int
@@ -112,12 +112,35 @@ class Autoencoder(nn.Module):
         return out
 
 
-def get_autoencoder(chk_path: str, device: str) -> Autoencoder:
-    obj = torch.load(chk_path, weights_only=True)
-    cfg = Config(**obj["config"])
-    model = Autoencoder(cfg.in_ch, cfg.base_ch, cfg.n_layers, cfg.k)
-    model.load_state_dict(obj["weights"])
+def get_autoencoder(
+    chk_path: str | None,
+    autoencoder_cfg: AutoencoderConfig | None = None,
+    device: str = "cpu",
+    to_eval: bool = False,
+    to_half: bool = False,
+) -> Autoencoder:
+    # Load model (plus weights) from a checkpoint OR initialse empty model
+    if autoencoder_cfg is not None and chk_path is None:
+        cfg = autoencoder_cfg
+        model = Autoencoder(cfg.in_ch, cfg.base_ch, cfg.n_layers, cfg.k)
+    elif chk_path is not None:
+        obj = torch.load(chk_path, weights_only=True, map_location=device)
+        try:
+            cfg = AutoencoderConfig(**obj["config"])
+        except KeyError:
+            assert autoencoder_cfg is not None, f"No config found in {chk_path}, one must be supplied!"
+            cfg = autoencoder_cfg
+
+        model = Autoencoder(cfg.in_ch, cfg.base_ch, cfg.n_layers, cfg.k)
+        model.load_state_dict(obj["weights"])
+    else:
+        raise Exception("One of chk_path or autoencoder_cfg must be supplied")
+
     model = model.to(device)
+    if to_eval:
+        model = model.eval()
+    if to_half:
+        model = model.half()
     return model
 
 

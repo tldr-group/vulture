@@ -102,3 +102,17 @@ class Denoiser(nn.Module):
             assert class_tokens is not None
             return x, class_tokens
         return x
+
+
+def get_denoiser(chk_path: str | None, device: str = "cpu", to_eval: bool = False, to_half: bool = False) -> Denoiser:
+    # Load model (plus weights) from a checkpoint OR initialse empty model
+    model = Denoiser(feat_dim=384)
+    if chk_path is not None:
+        obj = torch.load(chk_path, weights_only=True, map_location=device)
+        model.load_state_dict(obj["denoiser"])
+    model = model.to(device)
+    if to_eval:
+        model = model.eval()
+    if to_half:
+        model = model.half()
+    return model
