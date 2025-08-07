@@ -143,8 +143,8 @@ class EmbeddingDataset(Dataset):
 if __name__ == "__main__":
     ds = EmbeddingDataset(
         "data/imagenet_reduced",
-        "val",
-        Experiment("test", n_ch_in=384, n_ch_out=384, norm=False),
+        "train",
+        Experiment("test", n_ch_in=48, n_ch_out=48, norm=True),
         data_suffix="_lu_reg",
         using_splits=False,
         device="cuda:1",
