@@ -2,6 +2,44 @@
 
 ## Installation
 
+### Ubuntu
+
+Either
+
+```bash
+conda env create -f install/conda.yaml
+conda activate yoeo
+pip install . --no-deps
+# Force MAX_JOBS to avoid FA hogging all the cores; --no-build-isolation s.t it can find CUDA
+MAX_JOBS=4 pip install flash-attn --no-build-isolation
+```
+
+or
+
+```bash
+# Activate whatever venv you want
+pip install .
+MAX_JOBS=4 pip install flash-attn --no-build-isolation
+```
+
+The conda path comes with all the 'dev' dependencies (needed to reproduce the figures), if you want those with pip/uv/etc, run
+
+```bash
+pip install '.[dev]'
+MAX_JOBS=4 pip install flash-attn --no-build-isolation
+```
+
+### Windows
+
+In an 'Anaconda Powershell Prompt' (search in start menu)
+
+```powershell
+conda env create -f install\conda.yaml
+conda activate yoeo
+```
+
+Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AILab/flash-attention/issues/595) to build on windows.
+
 ## Notes 26/09/24;
 
 - most models bottom out around 15-17k loss (L2 or smooth L1)

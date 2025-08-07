@@ -35,6 +35,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "omegaconf>=2.3.0",
+  "segmentation_models_pytorch",
+  "albumentations",
   "featup@git+https://github.com/mhamilton723/FeatUp",
   "pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models"
 ]

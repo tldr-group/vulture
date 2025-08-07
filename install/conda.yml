@@ -1,4 +1,4 @@
-name: yeoe
+name: yoeo
 channels:
   - nvidia
   - conda-forge
@@ -14,6 +14,9 @@ dependencies:
       - ninja
       - packaging
       - omegaconf>=2.3.0
+      - omegaconf>=2.3.0
+      - segmentation_models_pytorch
+      - albumentations
       - interactive-seg-backend@git+https://github.com/tldr-group/interactive-seg-backend
       - featup@git+https://github.com/mhamilton723/FeatUp
       - pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models
