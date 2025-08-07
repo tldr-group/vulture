@@ -20,7 +20,7 @@ from types import MethodType
 from typing import Callable, Literal
 
 
-FeatureType = Literal["FEATUP", "DV2_FULL", "DV2_COMPRESSED"]
+FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED"]
 FIT3D_DINOv2_REG_SMALL_URL = "https://huggingface.co/yuanwenyue/FiT3D/resolve/main/dinov2_reg_small_finetuned.pth"
 
 MODEL_LIST = [
@@ -33,8 +33,8 @@ MODEL_LIST = [
 ]
 MODEL_MAP: dict[FeatureType, str] = {
     "FEATUP": MODEL_LIST[2],
-    "DV2_FULL": MODEL_LIST[1],
-    "DV2_COMPRESSED": MODEL_LIST[1],
+    "LOFTUP_FULL": MODEL_LIST[1],
+    "LOFTUP_COMPRESSED": MODEL_LIST[1],
 }
 
 
@@ -195,6 +195,7 @@ class PretrainedViTWrapper(nn.Module):
             feats = self.model.forward_features(x)
         else:  # ignore CLS + reg tokens
             feats = self.model.forward_features(x)[:, self.n_reg_tokens + 1 :]
+        feats = feats.permute((0, 2, 1))
 
         if make_2D and not add_reg:
             feats = feats.reshape((b, -1, n_patch_h, n_patch_w))

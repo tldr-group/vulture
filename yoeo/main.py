@@ -121,20 +121,22 @@ class CompleteUpsampler(nn.Module):
         match self.feature_type:
             case "FEATUP":
                 k = self.upsampler.n_ch_in
-                lr_feats, pca = get_lr_featup_feats_and_pca(
+                lr_feats, _ = get_lr_featup_feats_and_pca(
                     self.dv2_model, [lr_feat_input_img], n_feats_in=k, existing_pca=existing_pca
                 )
-            case "DV2_FULL":
+            case "LOFTUP_FULL":
                 assert self.denoiser is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
                 lr_feats = self.denoiser.forward_(dv2_feats)
-            case "DV2_COMPRESSED":
+            case "LOFTUP_COMPRESSED":
                 assert self.denoiser is not None
                 assert self.autoencoder is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
                 denoised_feats = self.denoiser.forward_(dv2_feats)
                 denoised_feats = F.normalize(denoised_feats, p=1, dim=1)
                 lr_feats = self.autoencoder.encoder(denoised_feats)
+            case _:
+                raise Exception(f"Unsupported feature type {_}")
 
         if output_norm:
             lr_feats = F.normalize(lr_feats, p=1, dim=1)

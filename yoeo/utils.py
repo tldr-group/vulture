@@ -1,32 +1,23 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
-from flash_attn import flash_attn_qkvpacked_func
+import torch.autograd.profiler as profiler
 
-from timm.models.vision_transformer import VisionTransformer, Attention, Block  # type: ignore
-
-import random
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
 
 from time import time_ns
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from types import MethodType
-from typing import Callable, Literal
-from dataclasses import dataclass, field
-
 from json import load as load_json
 
-import torch.autograd.profiler as profiler
-
+from typing import Literal
+from dataclasses import dataclass, field
 
 import warnings
 
-# TODO: take featup stiff into its own file ('feature_prep.py') & pca + data stuf into its own file
 
 warnings.filterwarnings("ignore")
 
@@ -334,7 +325,57 @@ def get_arrs_from_batch(
     return arrs
 
 
+def rescale(a: np.ndarray) -> np.ndarray:
+    a_min = a.min(axis=(0, 1), keepdims=True)
+    a_max = a.max(axis=(0, 1), keepdims=True)
+    out = (a - a_min) / (a_max - a_min)
+    return out
+
+
 # put vis code in here
+def vis(
+    save_path: str,
+    img: Image.Image | None,
+    lr_feats: torch.Tensor,
+    hr_feats: torch.Tensor,
+    remapped: torch.Tensor | None,
+    save_hr_separate_as_well: bool = False,
+    is_featup: bool = False,
+):
+    lr_feats_np = lr_feats.cpu()[0].detach().numpy().astype(np.float32)
+    hr_feats_np = hr_feats.cpu()[0].detach().numpy().astype(np.float32)
+    hr_feats_np = np.nan_to_num(hr_feats_np, 0)
+
+    if is_featup:
+        lr_feats_red = lr_feats_np.transpose((1, 2, 0))[:, :, 0:3]
+        lr_feats_red = rescale(lr_feats_red)
+        hr_feats_red = hr_feats_np.transpose((1, 2, 0))[:, :, 0:3]
+        hr_feats_red = rescale(hr_feats_red)
+    else:
+        lr_feats_red = do_2D_pca(lr_feats_np, 3, post_norm="minmax")
+        hr_feats_red = do_2D_pca(hr_feats_np, 3, post_norm="minmax")
+
+    n_cols = 4 if remapped is not None else 3
+
+    _, axs = plt.subplots(ncols=n_cols, figsize=(n_cols * 10, 10))
+    axs[0].imshow(img)
+    axs[1].imshow(lr_feats_red)
+    axs[2].imshow(hr_feats_red)
+    if remapped is not None:
+        res_2D_np = remapped.detach().cpu()[0].numpy()
+        res_feats_red = do_2D_pca(res_2D_np, 3, post_norm="minmax")
+        axs[3].imshow(res_feats_red)
+
+    for ax in axs:
+        ax.set_axis_off()
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches="tight")
+
+    if save_hr_separate_as_well:
+        sep_path = save_path.split(".")[0] + "_hr.png"
+        plt.imsave(sep_path, hr_feats_red)
+
+
 def visualise(
     img: torch.Tensor | Image.Image,
     lr_feats: torch.Tensor,
@@ -426,15 +467,3 @@ def plot_losses(train_loss: list[float], val_loss: list[float], out_path: str) -
     plt.tight_layout()
     plt.savefig(out_path)
     plt.close()
-
-
-if __name__ == "__main__":
-    DEVICE = "cuda:1"
-    dv2 = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
-    dv2 = add_flash_attention(dv2)
-    dv2 = dv2.eval().to(DEVICE).half()
-    with profiler.profile(with_stack=True, profile_memory=True) as prof:
-        img = torch.zeros((1, 3, 518, 518)).half().to(DEVICE)
-        res = get_lr_feats(dv2, img, 25)
-
-    print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cpu_time_total", row_limit=5))
