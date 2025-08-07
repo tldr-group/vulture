@@ -1,42 +1,34 @@
 {
-    "name": "full_dv2_lu_reg",
-    "net": {
-        "type": "combined",
-        "k": 3,
-        "n_ch_in": 384,
-        "n_ch_hidden": 96,
-        "n_ch_out": 384,
-        "n_ch_guidance": 3,
-        "n_ch_downsampler": 64,
-        "feat_weight": -1,
-        "patch_size": 14,
-        "padding_mode": "replicate"
-    },
-    "transforms": {
-        "flip_h_prob": 0.5,
-        "flip_v_prob": 0.5,
-        "angles_deg": [
-            0,
-            0,
-            0,
-            0,
-            90,
-            180,
-            270
-        ],
-        "shift_dirs": [],
-        "shift_dists": [],
-        "norm": true
-    },
-    "training": {
-        "loss": "smooth_l1",
-        "optim": "adamw",
-        "lr": 1e-4,
-        "clip_norm_threshold": 1.0,
-        "weight_decay": 0.0,
-        "batch_size": 32,
-        "n_epochs": 5000,
-        "save_per": 6,
-        "weights_init": "ones"
-    }
+  "name": "upsampler_LU_c96",
+  "net": {
+    "type": "combined",
+    "k": 3,
+    "n_ch_in": 384,
+    "n_ch_hidden": 96,
+    "n_ch_out": 384,
+    "n_ch_guidance": 3,
+    "n_ch_downsampler": 64,
+    "feat_weight": -1,
+    "patch_size": 14,
+    "padding_mode": "replicate"
+  },
+  "transforms": {
+    "flip_h_prob": 0.5,
+    "flip_v_prob": 0.5,
+    "angles_deg": [0, 0, 0, 0, 90, 180, 270],
+    "shift_dirs": [],
+    "shift_dists": [],
+    "norm": true
+  },
+  "training": {
+    "loss": "smooth_l1",
+    "optim": "adamw",
+    "lr": 1e-4,
+    "clip_norm_threshold": 1.0,
+    "weight_decay": 0.0,
+    "batch_size": 32,
+    "n_epochs": 5000,
+    "save_per": 6,
+    "weights_init": "ones"
+  }
 }
