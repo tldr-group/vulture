@@ -9,6 +9,8 @@ from sklearn.decomposition import PCA
 
 from random import choice
 
+from yoeo.models import PretrainedViTWrapper
+
 """
 This code is loosely adapted/directly taken from FeatUp [1, 2], whose high-res implict features I use as a training target
 for my upsampler. When training their implict upsampler per-image they prepare a dataset of features (from, say, DINO) of
@@ -63,15 +65,11 @@ class PCAUnprojector(nn.Module):
                 # Register tensors as buffers
                 self.register_buffer(
                     "components_",
-                    torch.tensor(
-                        sklearn_pca.components_, device=device, dtype=feats.dtype
-                    ),
+                    torch.tensor(sklearn_pca.components_, device=device, dtype=feats.dtype),
                 )
                 self.register_buffer(
                     "singular_values_",
-                    torch.tensor(
-                        sklearn_pca.singular_values_, device=device, dtype=feats.dtype
-                    ),
+                    torch.tensor(sklearn_pca.singular_values_, device=device, dtype=feats.dtype),
                 )
                 self.register_buffer(
                     "mean_",
@@ -93,9 +91,7 @@ class PCAUnprojector(nn.Module):
             red_feats_reshaped = red_feats.permute(0, 2, 3, 1).reshape(b * h * w, c)
             # print(red_feats_reshaped.dtype, self.components_.dtype)
             red_feats_reshaped = red_feats_reshaped.to(self.components_.dtype)
-            unprojected = (
-                red_feats_reshaped @ self.components_
-            ) + self.mean_.unsqueeze(0)
+            unprojected = (red_feats_reshaped @ self.components_) + self.mean_.unsqueeze(0)
             return unprojected.reshape(b, h, w, self.original_dim).permute(0, 3, 1, 2)
 
     def project(self, feats):
@@ -169,9 +165,7 @@ class JitteredImage(Dataset):
     def __getitem__(self, item):
         img = choice(self.imgs)
         h, w = img.shape[2:]
-        transform_params = sample_transform(
-            self.use_flips, self.max_pad, self.max_zoom, h, w
-        )
+        transform_params = sample_transform(self.use_flips, self.max_pad, self.max_zoom, h, w)
         return (
             apply_jitter(img, self.max_pad, transform_params).squeeze(0),
             transform_params,
@@ -192,6 +186,7 @@ def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
     return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
 
 
+@torch.no_grad()
 def get_lr_feats(
     model,
     imgs: list[torch.Tensor],
@@ -199,7 +194,7 @@ def get_lr_feats(
     fit3d: bool = False,
     n_feats_in: int = 128,
     n_batch: int = 50,
-    existing_pca: PCAUnprojector | None = None
+    existing_pca: PCAUnprojector | None = None,
 ) -> tuple[torch.Tensor, PCAUnprojector]:
     cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
     cfg_use_flips = True
@@ -208,29 +203,65 @@ def get_lr_feats(
     cfg_pca_batch = n_batch
     cfg_proj_dim = n_feats_in
 
-    dataset = JitteredImage(
-        imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad
-    )
+    dataset = JitteredImage(imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
     loader = DataLoader(dataset, cfg_pca_batch)
-    with torch.no_grad():
-        lr_feats = project(imgs[0], model, fit3d)
+    lr_feats = project(imgs[0], model, fit3d)
 
-        if existing_pca is None:
-            jit_features = []
-            for transformed_image, tp in loader:
-                jit_features.append(project(transformed_image, model, fit3d))
-            jit_features = torch.cat(jit_features, dim=0)
+    if existing_pca:
+        return existing_pca.project(lr_feats)
 
-            unprojector = PCAUnprojector(
-                jit_features[:cfg_pca_batch],
-                cfg_proj_dim,
-                lr_feats.device,
-                use_torch_pca=True,
-            )
-        else:
-            unprojector = existing_pca
-        lr_feats = unprojector.project(lr_feats)
-    return lr_feats, unprojector
+    jit_features: list[torch.Tensor] = []
+    for transformed_image, _ in loader:
+        jit_features.append(project(transformed_image, model, fit3d))
+    stacked_jit_features = torch.cat(jit_features, dim=0)
+
+    pca = PCAUnprojector(
+        stacked_jit_features[:cfg_pca_batch],
+        cfg_proj_dim,
+        lr_feats.device,
+        use_torch_pca=True,
+    )
+    lr_feats = pca.project(lr_feats)
+    return lr_feats, pca
+
+
+@torch.no_grad()
+def get_lr_featup_feats_and_pca(
+    model: PretrainedViTWrapper,
+    imgs: list[torch.Tensor],
+    n_imgs: int = 50,
+    n_feats_in: int = 128,
+    n_batch: int = 50,
+    existing_pca: PCAUnprojector | None = None,
+) -> tuple[torch.Tensor, PCAUnprojector]:
+    cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
+    cfg_use_flips = True
+    cfg_max_zoom = 1.8
+    cfg_max_pad = 30
+    cfg_pca_batch = n_batch
+    cfg_proj_dim = n_feats_in
+
+    dataset = JitteredImage(imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
+    loader = DataLoader(dataset, cfg_pca_batch)
+    lr_feats = model.forward_features(imgs[0], make_2D=True)
+
+    if existing_pca:
+        return existing_pca.project(lr_feats)
+
+    jit_features: list[torch.Tensor] = []
+    for transformed_image, _ in loader:
+        transformed_feats = model.forward_features(transformed_image, make_2D=True)
+        jit_features.append(transformed_feats)
+    stacked_jit_features = torch.cat(jit_features, dim=0)
+
+    pca = PCAUnprojector(
+        stacked_jit_features[:cfg_pca_batch],
+        cfg_proj_dim,
+        lr_feats.device,
+        use_torch_pca=True,
+    )
+    lr_feats = pca.project(lr_feats)
+    return lr_feats, pca
 
 
 class TorchPCA(object):
@@ -240,9 +271,7 @@ class TorchPCA(object):
     def fit(self, X):
         self.mean_ = X.mean(dim=0)
         unbiased = X - self.mean_.unsqueeze(0)
-        U, S, V = torch.pca_lowrank(
-            unbiased, q=self.n_components, center=False, niter=4
-        )
+        U, S, V = torch.pca_lowrank(unbiased, q=self.n_components, center=False, niter=4)
         self.components_ = V.T
         self.singular_values_ = S
         return self
@@ -295,9 +324,7 @@ def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=N
         x_red -= x_red.min(dim=0, keepdim=True).values
         x_red /= x_red.max(dim=0, keepdim=True).values
         B, C, H, W = feats.shape
-        reduced_feats.append(
-            x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2)
-        )  # .to(device)
+        reduced_feats.append(x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2))  # .to(device)
 
     return reduced_feats, fit_pca
 

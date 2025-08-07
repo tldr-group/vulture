@@ -1,14 +1,27 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.transforms import functional as TF
 from PIL import Image
 
 import numpy as np
 
-from yoeo.models.model import FeatureUpsampler
-from yoeo.feature_prep import get_lr_feats, PCAUnprojector
+from yoeo.models.external.vit_wrapper import add_flash_attention
+from yoeo.models import (
+    PretrainedViTWrapper,
+    Denoiser,
+    Autoencoder,
+    FeatureUpsampler,
+    AutoencoderConfig,
+    UpsamplerConfig,
+    get_denoiser,
+    get_autoencoder,
+    get_upsampler,
+    MODEL_MAP,
+    FeatureType,
+)
+from yoeo.feature_prep import get_lr_feats, PCAUnprojector, get_lr_featup_feats_and_pca
 from yoeo.utils import (
-    add_flash_attention,
     expriment_from_json,
     closest_crop,
     convert_image,
@@ -16,6 +29,134 @@ from yoeo.utils import (
 )
 
 
+def transform_image(
+    image: np.ndarray | Image.Image | torch.Tensor, device: str, to_half: bool = False
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image).convert("RGB")
+
+    if isinstance(image, torch.Tensor):
+        _h, _w = image.shape[-2:]
+        batch = len(image.shape) < 4
+    else:
+        _h, _w = image.height, image.width
+        batch = True
+
+    tr = closest_crop(_h, _w)
+    lr_feat_input_img = convert_image(
+        image, tr, batch=batch, to_gpu=device != "cpu", device_str=device, to_half=to_half
+    )
+
+    upsampler_input_img = (
+        TF.normalize(
+            TF.pil_to_tensor(image).to(torch.float32),
+            [0.485, 0.456, 0.406],
+            [0.229, 0.224, 0.225],
+        )
+        .unsqueeze(0)
+        .to(device)
+    )
+
+    return lr_feat_input_img, upsampler_input_img
+
+
+class CompleteUpsampler(nn.Module):
+    def __init__(
+        self,
+        feature_type: FeatureType,
+        chk_or_cfg: str | UpsamplerConfig,
+        denoiser_chk: str | None = None,
+        autoencoder_chk_or_cfg: str | AutoencoderConfig | None = None,
+        device: str = "cpu",
+        add_flash_attn: bool = True,
+        to_eval: bool = False,
+        to_half: bool = False,
+    ) -> None:
+        super().__init__()
+        self.feature_type: FeatureType = feature_type
+        # Load base DINOv2 model
+        self.dv2_model = PretrainedViTWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
+        self.denoiser: Denoiser | None = None
+        self.autoencoder: Autoencoder | None = None
+
+        # Load or initialise optional models
+        if denoiser_chk is None and feature_type != "FEATUP":
+            self.denoiser = get_denoiser(None, device, to_eval, to_half)
+        elif denoiser_chk is not None and feature_type != "FEATUP":
+            self.denoiser = get_denoiser(denoiser_chk, device, to_eval, to_half)
+
+        if isinstance(autoencoder_chk_or_cfg, str):
+            self.autoencoder = get_autoencoder(autoencoder_chk_or_cfg, None, device, to_eval, to_half)
+        elif isinstance(autoencoder_chk_or_cfg, AutoencoderConfig):
+            self.autoencoder = get_autoencoder(None, autoencoder_chk_or_cfg, device, to_eval, to_half)
+
+        # Load or initialise upsampler
+        if isinstance(chk_or_cfg, str):
+            self.upsampler = get_upsampler(chk_or_cfg, None, device, to_eval, to_half)
+        else:
+            self.upsampler = get_upsampler(None, chk_or_cfg, device, to_eval, to_half)
+
+        self.device = device
+        self.to_eval = to_eval
+        if self.to_eval:
+            self = self.eval()
+        self.to_half = to_half
+
+    def transform_image(self, image: np.ndarray | Image.Image | torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return transform_image(image, self.device, self.to_half)
+
+    def get_lr_feats(
+        self,
+        image: np.ndarray | Image.Image | torch.Tensor,
+        output_norm: bool = True,
+        transform_input: bool = True,
+        existing_pca: PCAUnprojector | None = None,
+    ) -> torch.Tensor:
+        if transform_input:
+            lr_feat_input_img, _ = self.transform_image(image)
+        else:
+            assert isinstance(image, torch.Tensor), "Image must be tensor if transform_input is false"
+            lr_feat_input_img = image
+
+        match self.feature_type:
+            case "FEATUP":
+                k = self.upsampler.n_ch_in
+                lr_feats, pca = get_lr_featup_feats_and_pca(
+                    self.dv2_model, [lr_feat_input_img], n_feats_in=k, existing_pca=existing_pca
+                )
+            case "DV2_FULL":
+                assert self.denoiser is not None
+                dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                lr_feats = self.denoiser.forward_(dv2_feats)
+            case "DV2_COMPRESSED":
+                assert self.denoiser is not None
+                assert self.autoencoder is not None
+                dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                denoised_feats = self.denoiser.forward_(dv2_feats)
+                denoised_feats = F.normalize(denoised_feats, p=1, dim=1)
+                lr_feats = self.autoencoder.encoder(denoised_feats)
+
+        if output_norm:
+            lr_feats = F.normalize(lr_feats, p=1, dim=1)
+        return lr_feats
+
+    def get_hr_feats(
+        self, upsampler_img: torch.Tensor, lr_feats: torch.Tensor, cast_to: torch.dtype = torch.float32
+    ) -> torch.Tensor:
+        with torch.autocast(self.device, cast_to):
+            hr_feats = self.upsampler(upsampler_img, lr_feats)
+        return hr_feats
+
+    def forward(
+        self, image: np.ndarray | Image.Image | torch.Tensor, existing_pca: PCAUnprojector | None = None
+    ) -> torch.Tensor:
+        lr_feat_input_img, upsampler_input_img = self.transform_image(image)
+        lr_feats = self.get_lr_feats(lr_feat_input_img, True, False, existing_pca=existing_pca)
+        dtype = torch.float16 if self.device else torch.float32
+        return self.get_hr_feats(upsampler_input_img, lr_feats, dtype)
+
+
+# OLD FUNCTIONS
 def get_dv2_model(
     fit_3d: bool = True,
     add_flash: bool = True,
@@ -67,7 +208,7 @@ def get_hr_feats(
     image: Image.Image | np.ndarray,
     dv2: torch.nn.Module,
     upsampler: FeatureUpsampler,
-    device: str | torch.device = "cuda:0",
+    device: str = "cuda:0",
     fit_3d: bool = True,
     n_imgs_for_red: int = 50,
     n_ch_in: int = 64,
