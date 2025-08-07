@@ -2,11 +2,19 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789)
 
+## Contents
+
+- [Installation](#installation)
+- [Checkpoints](#checkpoints)
+- [Project Structure](#projectstructure)
+- [Citation](#citation)
+- [Contact](#contact)
+
 ## Installation
 
 Note: you'll need `nvcc` installed to install flash-attn.
 
-### Ubuntu
+### Ubuntu / Mac
 
 Either
 
@@ -15,7 +23,7 @@ conda env create -f install/conda.yaml
 conda activate yoeo
 pip install . --no-deps
 # Force MAX_JOBS to avoid FA hogging all the cores; --no-build-isolation s.t it can find CUDA & nvcc
-MAX_JOBS=4 pip install flash-attn --no-build-isolation
+MAX_JOBS=4 pip install --no-build-isolation flash-attn
 ```
 
 or
@@ -24,7 +32,8 @@ or
 python -m venv .venv
 source .venv/bin/activate
 pip install .
-MAX_JOBS=4 pip install flash-attn --no-build-isolation
+MAX_JOBS=4 pip install --no-build-isolation flash-attn
+python apply.py
 ```
 
 or
@@ -32,6 +41,9 @@ or
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh # install uv
 uv sync
+# update .env if we need to change CUDA_HOME / LD_LIBRARY_PATH later
+uv run --env-file install/.env -- pip install --no-build-isolation flash-attn
+uv run apply.py
 ```
 
 The conda path comes with all the 'dev' dependencies (needed to reproduce the figures), if you want those with pip/uv/etc, run
@@ -52,9 +64,9 @@ conda activate yoeo
 
 Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AILab/flash-attention/issues/595) to build on windows.
 
-### Checkpoints
+## Checkpoints
 
-### Project structure
+## Project structure
 
 ```bash
 examples/ # example notebooks for usage
@@ -87,3 +99,7 @@ yoeo/
 ├─ feature_prep.py # FeatUp style feature preprocessing (PCA)
 └─ utils.py # plotting etc
 ```
+
+## Citation
+
+## Contact
