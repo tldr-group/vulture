@@ -17,9 +17,10 @@ from flash_attn import flash_attn_qkvpacked_func
 import re
 from typing import cast
 from types import MethodType
-from typing import Callable
+from typing import Callable, Literal
 
 
+FeatureType = Literal["FEATUP", "DV2_FULL", "DV2_COMPRESSED"]
 FIT3D_DINOv2_REG_SMALL_URL = "https://huggingface.co/yuanwenyue/FiT3D/resolve/main/dinov2_reg_small_finetuned.pth"
 
 MODEL_LIST = [
@@ -30,6 +31,11 @@ MODEL_LIST = [
     # FIT3D finetuned
     "fit3D_vit_small_patch14_reg4_dinov2.lvd142m",
 ]
+MODEL_MAP: dict[FeatureType, str] = {
+    "FEATUP": MODEL_LIST[2],
+    "DV2_FULL": MODEL_LIST[1],
+    "DV2_COMPRESSED": MODEL_LIST[1],
+}
 
 
 class Patch:
@@ -75,6 +81,7 @@ class PretrainedViTWrapper(nn.Module):
         add_flash_attn: bool = True,
         dynamic_img_size: bool = True,
         dynamic_img_pad: bool = False,
+        device: str = "cpu",
         **kwargs,
     ):
         super().__init__()
@@ -91,7 +98,7 @@ class PretrainedViTWrapper(nn.Module):
 
         self.dynamic_img_size = dynamic_img_size
         self.dynamic_img_pad = dynamic_img_pad
-        self.model, self.transformation = self.create_model(model_identifier, **kwargs)
+        self.model, self.transformation = self.create_model(model_identifier, device, **kwargs)
         # overwrite the stride size
         if stride != self.model.patch_embed.proj.stride[0]:
             self.model.patch_embed.proj.stride = (stride, stride)
@@ -109,6 +116,8 @@ class PretrainedViTWrapper(nn.Module):
         if add_flash_attn:
             self.model = add_flash_attention(self.model)
 
+        self.to(device)
+
     @property
     def n_output_dims(self) -> int:
         assert self.model.pos_embed
@@ -122,7 +131,9 @@ class PretrainedViTWrapper(nn.Module):
     def last_layer_index(self) -> int:
         return self.num_blocks - 1
 
-    def create_model(self, model_identifier: str, **kwargs) -> tuple[VisionTransformer, transforms.Compose]:
+    def create_model(
+        self, model_identifier: str, device: str, **kwargs
+    ) -> tuple[VisionTransformer, transforms.Compose]:
         is_fit3D = "fit3D" in model_identifier
         if is_fit3D:
             model_identifier = model_identifier[6:]
@@ -142,7 +153,7 @@ class PretrainedViTWrapper(nn.Module):
 
         if is_fit3D:
             # load finetuned weights
-            state_dict = torch.hub.load_state_dict_from_url(FIT3D_DINOv2_REG_SMALL_URL, map_location="cpu")
+            state_dict = torch.hub.load_state_dict_from_url(FIT3D_DINOv2_REG_SMALL_URL, map_location=device)
             model.load_state_dict(state_dict)
 
         return model, img_transforms

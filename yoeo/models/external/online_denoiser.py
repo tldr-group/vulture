@@ -103,6 +103,21 @@ class Denoiser(nn.Module):
             return x, class_tokens
         return x
 
+    def forward_(
+        self, x: torch.Tensor, permute_channel: bool = True, return_channel_first: bool = True
+    ) -> torch.Tensor:
+        if permute_channel:
+            x = x.permute((0, 2, 3, 1))
+        b, h, w, c = x.shape
+        x = x.reshape(b, h * w, c)
+        if self.pos_embed is not None:
+            x = x + resample_abs_pos_embed(self.pos_embed, (h, w), num_prefix_tokens=0)
+        x = self.denoiser(x)
+        x = x.reshape(b, h, w, c)
+        if return_channel_first:
+            x = x.permute(0, 3, 1, 2)
+        return x
+
 
 def get_denoiser(chk_path: str | None, device: str = "cpu", to_eval: bool = False, to_half: bool = False) -> Denoiser:
     # Load model (plus weights) from a checkpoint OR initialse empty model

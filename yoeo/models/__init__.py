@@ -10,9 +10,10 @@ __all__ = [
     "Upsampler",
     "FeatureUpsampler",
     "get_upsampler",
+    "AutoencoderConfig",
     "UpsamplerConfig",
 ]
 from yoeo.models.external.vit_wrapper import PretrainedViTWrapper, MODEL_MAP, FeatureType
-from yoeo.models.external.autoencoder import Autoencoder, get_autoencoder
+from yoeo.models.external.autoencoder import Autoencoder, AutoencoderConfig, get_autoencoder
 from yoeo.models.external.online_denoiser import Denoiser, get_denoiser
 from yoeo.models.model import LearnedDownsampler, Upsampler, FeatureUpsampler, get_upsampler, UpsamplerConfig
