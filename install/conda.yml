@@ -11,5 +11,9 @@ dependencies:
   - torchmetrics>=0.10.3
   - pip
   - pip:
-    - ninja
-    - packaging
+      - ninja
+      - packaging
+      - omegaconf>=2.3.0
+      - interactive-seg-backend@git+https://github.com/tldr-group/interactive-seg-backend
+      - featup@git+https://github.com/mhamilton723/FeatUp
+      - pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models
