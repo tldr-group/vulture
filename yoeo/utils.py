@@ -111,40 +111,6 @@ def init_weights(m: nn.Module, init: InitTypes):
             pass
 
 
-class Patch:
-    @staticmethod
-    def add_flash_attn() -> Callable:
-        """Replaces normal 'forward()' method of the memory efficient attention layer (block.attn)
-        in the Dv2 model with an optional early return with attention. Used if xformers used.
-
-        :return: the new forward method
-        :rtype: Callable
-        """
-
-        def forward(
-            self: Attention,
-            x: torch.Tensor,
-            attn_bias=None,
-        ) -> torch.Tensor:
-            B, N, C = x.shape
-            qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
-            x = flash_attn_qkvpacked_func(qkv)  # type: ignore
-            x = x.reshape([B, N, C])
-
-            x = self.proj(x)
-            x = self.proj_drop(x)
-            return x
-
-        return forward
-
-
-def add_flash_attention(model: VisionTransformer) -> VisionTransformer:
-    blk: Block
-    for blk in model.blocks:  # type: ignore
-        blk.attn.forward = MethodType(Patch.add_flash_attn(), blk.attn)
-    return model
-
-
 # ========================= PCA STUFF =========================
 def flatten(x: torch.Tensor | np.ndarray) -> np.ndarray:
     y: np.ndarray

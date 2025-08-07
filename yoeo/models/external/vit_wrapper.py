@@ -5,16 +5,19 @@ and has a helper to get patch features out.
 Adpated from https://github.com/Jiawei-Yang/Denoising-ViT/blob/main/dvt/models/vit_wrapper.py
 """
 
-import re
-import types
-from typing import cast
-
-import timm
-import timm.data
 import torch
-from timm.models.vision_transformer import VisionTransformer
 from torch import nn
 from torchvision import transforms
+from timm import create_model
+from timm.data import create_transform, resolve_model_data_config
+from timm.models.vision_transformer import VisionTransformer, Attention, Block
+
+from flash_attn import flash_attn_qkvpacked_func
+
+import re
+from typing import cast
+from types import MethodType
+from typing import Callable
 
 
 FIT3D_DINOv2_REG_SMALL_URL = "https://huggingface.co/yuanwenyue/FiT3D/resolve/main/dinov2_reg_small_finetuned.pth"
@@ -29,11 +32,47 @@ MODEL_LIST = [
 ]
 
 
+class Patch:
+    @staticmethod
+    def add_flash_attn() -> Callable:
+        """Replaces normal 'forward()' method of the memory efficient attention layer (block.attn)
+        in the Dv2 model with an optional early return with attention. Used if xformers used.
+
+        :return: the new forward method
+        :rtype: Callable
+        """
+
+        def forward(
+            self: Attention,
+            x: torch.Tensor,
+            attn_bias=None,
+        ) -> torch.Tensor:
+            # TODO: attn_bias -> attn_mask in new timm, find way to align these
+            B, N, C = x.shape
+            qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
+            x = flash_attn_qkvpacked_func(qkv)  # type: ignore
+            x = x.reshape([B, N, C])
+
+            x = self.proj(x)
+            x = self.proj_drop(x)
+            return x
+
+        return forward
+
+
+def add_flash_attention(model: VisionTransformer) -> VisionTransformer:
+    blk: Block
+    for blk in model.blocks:  # type: ignore
+        blk.attn.forward = MethodType(Patch.add_flash_attn(), blk.attn)
+    return model
+
+
 class PretrainedViTWrapper(nn.Module):
     def __init__(
         self,
         model_identifier: str = "vit_base_patch14_dinov2.lvd142m",
         stride: int = 14,
+        add_flash_attn: bool = True,
         dynamic_img_size: bool = True,
         dynamic_img_pad: bool = False,
         **kwargs,
@@ -65,7 +104,10 @@ class PretrainedViTWrapper(nn.Module):
                     img_size[1] - self.patch_size[1]
                 ) // self.proj.stride[1] + 1
 
-            self.model.patch_embed.dynamic_feat_size = types.MethodType(dynamic_feat_size, self.model.patch_embed)
+            self.model.patch_embed.dynamic_feat_size = MethodType(dynamic_feat_size, self.model.patch_embed)
+
+        if add_flash_attn:
+            self.model = add_flash_attention(self.model)
 
     @property
     def n_output_dims(self) -> int:
@@ -85,7 +127,7 @@ class PretrainedViTWrapper(nn.Module):
         if is_fit3D:
             model_identifier = model_identifier[6:]
 
-        model = timm.create_model(
+        model = create_model(
             model_identifier,
             pretrained=True,
             num_classes=0,
@@ -95,8 +137,8 @@ class PretrainedViTWrapper(nn.Module):
         )
         # Different models have different data configurations
         # e.g., their training resolution, normalization, etc, are different
-        data_config = timm.data.resolve_model_data_config(model=model)
-        img_transforms = cast(transforms.Compose, timm.data.create_transform(**data_config, is_training=False))
+        data_config = resolve_model_data_config(model=model)
+        img_transforms = cast(transforms.Compose, create_transform(**data_config, is_training=False))
 
         if is_fit3D:
             # load finetuned weights
