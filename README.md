@@ -1,6 +1,17 @@
 # threetures
 
 [![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789)
+[![Huggingface](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-checkpoints-orange)](https://huggingface.co/rmdocherty/vulture)
+
+Convolutional upsampling of DINOv2 features for weakly supervised segmentation. Check out the [examples](examples/) to get started!
+
+## TODO:
+
+- Fix train files with new structure
+  - update save to also save config
+- Update paper_figures to use new structure
+- checkpoints plus a download script
+- zenodo for fig data
 
 ## Contents
 
@@ -12,7 +23,7 @@
 
 ## Installation
 
-Note: you'll need `nvcc` installed to install flash-attn.
+Note: you'll need `nvcc` installed to install flash-attn. See [`install/INSTALL_NVCC.md`](install/INSTALL_NVCC.md).
 
 ### Ubuntu / Mac
 
@@ -66,6 +77,8 @@ Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AIL
 
 ## Checkpoints
 
+Checkpoints are available from [huggingface](https://huggingface.co/rmdocherty/vulture/tree/main), either download them into the `trained_models/` directory or run `./install/download_chkpoints.sh` (Ubuntu) or `./install/download_chkpoints.ps1` (Windows).
+
 ## Project structure
 
 ```bash
@@ -88,8 +101,8 @@ yoeo/
 ├─ models/
 │  ├─ configs/ # JSONs for training run parameters
 │  ├─ external/ # external models used
-│  │  ├─ autoencoder.py # compresses DINOv2 features
-│  │  ├─ online_denoiser.py # 'denoises' ViT features
+│  │  ├─ autoencoder.py # compresses low-res DINOv2 features
+│  │  ├─ online_denoiser.py # 'denoises' low-res ViT features
 │  │  └─ vit_wrapper.py # wrapper around DINOv2 for low-res features
 │  ├─ layers.py # (u-net) layer components for our down-/upsampler
 │  └─ model.py # down-/upsampler architecture
