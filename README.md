@@ -9,8 +9,6 @@ Check out the [examples](examples/) to get started!
 
 ## TODO:
 
-- Fix train files with new structure
-  - update save to also save config
 - Update paper_figures to use new structure
 - update gui to use new strucutre
 - zenodo for fig data

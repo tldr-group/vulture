@@ -1,3 +1,4 @@
+from typing import Any, Mapping
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -182,12 +183,19 @@ def get_dv2_model(
 
 def get_upsampler_and_expr(
     chk_path: str,
-    cfg_path: str,
+    cfg_path: str | None,
     device: str | torch.device = "cuda:0",
-) -> tuple[FeatureUpsampler, Experiment]:
-    upsampler_weights = torch.load(chk_path, weights_only=True, map_location=device)
+) -> tuple[FeatureUpsampler, Experiment | UpsamplerConfig]:
+    obj: Mapping[str, Any] = torch.load(chk_path, weights_only=True, map_location=device)
 
-    expr = expriment_from_json(cfg_path)
+    expr: Experiment | UpsamplerConfig
+    if "config" in obj:
+        expr = UpsamplerConfig(**obj["config"])
+        state_dict = obj["weights"]
+    else:
+        assert cfg_path is not None
+        expr = expriment_from_json(cfg_path)
+        state_dict = obj
 
     upsampler = FeatureUpsampler(
         expr.patch_size,
@@ -200,7 +208,7 @@ def get_upsampler_and_expr(
         feat_weight=expr.feat_weight,
         padding_mode=expr.padding_mode,
     )
-    upsampler.load_state_dict(upsampler_weights)
+    upsampler.load_state_dict(state_dict)
     upsampler = upsampler.eval().to(device)
     return upsampler, expr
 
