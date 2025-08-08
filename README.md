@@ -5,11 +5,11 @@
 
 Convolutional upsampling of DINOv2 [1] features for weakly supervised segmentation [2].
 In short, we train a bisected U-net to upsample low-resolution features by targeting high-resolution ground truths generated from other methods (_i.e,_ FeatUp [3], LoftUp [4]) which may not scale as nicely in time / memory / generalisability as CNNs.
+They can they be used in Weka-style [5] feature-based / interactive / weakly supervised segmentation. 
 Check out the [examples](examples/) to get started!
 
 ## TODO:
 
-- Update paper_figures to use new structure
 - update gui to use new strucutre
 - zenodo for fig data
 
@@ -135,4 +135,5 @@ vulture/
 - [2] R. Docherty _et al._, "Upsampling DINOv2 features for unsupervised vision tasks and weakly supervised materials segmentation" (2024), Neurips AI4Mat workshop, https://arxiv.org/abs/2410.19836
 - [3] S. Fu _et al._, "FeatUp: A Model-Agnostic Framework for Features at Any Resolution" (2024), ICLR, https://arxiv.org/abs/2403.10516
 - [4] H. Huang _et al._, "LoftUp: A Coordinate-Based Feature Upsampler for Vision Foundation Models", ICCV, https://arxiv.org/abs/2504.14032
-- [5] J. Yang _et al._, "Denoising Vision Transformers" (2024), ECCV, https://arxiv.org/abs/2401.02957
+- [5] I. Arganda-Carreras _et al._, " Trainable Weka Segmentation: a machine learning tool for microscopy pixel classification", Bioinformatics (2017), https://academic.oup.com/bioinformatics/article/33/15/2424/3092362
+- [6] J. Yang _et al._, "Denoising Vision Transformers" (2024), ECCV, https://arxiv.org/abs/2401.02957
