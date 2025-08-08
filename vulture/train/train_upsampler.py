@@ -5,9 +5,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 from shutil import copy
 
-from yoeo.datasets import EmbeddingDataset, DataLoader, unnorm
-from yoeo.models import FeatureUpsampler
-from yoeo.utils import visualise, plot_losses, expriment_from_json, init_weights
+from vulture.datasets import EmbeddingDataset, DataLoader, unnorm
+from vulture.models import FeatureUpsampler
+from vulture.models.model import init_weights
+from vulture.utils import visualise, plot_losses, expriment_from_json
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -18,7 +19,7 @@ DEVICE = "cuda:1"
 
 OUT_PATH = "experiments/current"
 
-expr_path = "yoeo/models/configs/upsampler_LU_compressed.json"
+expr_path = "vulture/models/configs/upsampler_LU_compressed.json"
 expr = expriment_from_json(expr_path)
 copy(expr_path, f"{OUT_PATH}/config.json")
 print(expr)

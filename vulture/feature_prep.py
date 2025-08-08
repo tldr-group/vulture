@@ -9,7 +9,7 @@ from sklearn.decomposition import PCA
 
 from random import choice
 
-from yoeo.models import PretrainedViTWrapper
+from vulture.models import PretrainedViTWrapper
 
 """
 This code is loosely adapted/directly taken from FeatUp [1, 2], whose high-res implict features I use as a training target
@@ -234,7 +234,7 @@ def get_lr_featup_feats_and_pca(
     n_batch: int = 50,
     existing_pca: PCAUnprojector | None = None,
 ) -> tuple[torch.Tensor, PCAUnprojector]:
-    cfg_n_images = min(n_imgs * len(imgs), 300)  # 3000  # 3000
+    cfg_n_images = min(n_imgs * len(imgs), 50)  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
     cfg_max_pad = 30

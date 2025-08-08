@@ -6,10 +6,10 @@ import numpy as np
 
 from PIL import Image
 
-from yoeo.comparisons.loftup.featurizers.util import get_featurizer
-from yoeo.comparisons.online_denoiser import Denoiser
-from yoeo.comparisons.autoencoder import get_autoencoder
-from yoeo.utils import do_2D_pca
+from vulture.comparisons.loftup.featurizers.util import get_featurizer
+from vulture.models.external.online_denoiser import Denoiser
+from vulture.models.external.autoencoder import get_autoencoder
+from vulture.utils import do_2D_pca
 import matplotlib.pyplot as plt
 
 
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         upsampler = upsampler.to(DEVICE).eval()
 
         denoiser = Denoiser(feat_dim=384).to(DEVICE)
-        denoiser_weights = torch.load("yoeo/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
+        denoiser_weights = torch.load("vulture/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
         denoiser.load_state_dict(denoiser_weights["denoiser"])
 
         autoencoder = get_autoencoder("trained_models/dac_dv2_denoised_e500.pth", DEVICE)

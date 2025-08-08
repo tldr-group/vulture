@@ -6,8 +6,8 @@ from PIL import Image
 
 import numpy as np
 
-from yoeo.models.external.vit_wrapper import add_flash_attention
-from yoeo.models import (
+from vulture.models.external.vit_wrapper import add_flash_attention
+from vulture.models import (
     PretrainedViTWrapper,
     Denoiser,
     Autoencoder,
@@ -20,8 +20,8 @@ from yoeo.models import (
     MODEL_MAP,
     FeatureType,
 )
-from yoeo.feature_prep import get_lr_feats, PCAUnprojector, get_lr_featup_feats_and_pca
-from yoeo.utils import (
+from vulture.feature_prep import get_lr_feats, PCAUnprojector, get_lr_featup_feats_and_pca
+from vulture.utils import (
     expriment_from_json,
     closest_crop,
     convert_image,

@@ -1,4 +1,4 @@
-name: yoeo
+name: vulture
 channels:
   - nvidia
   - conda-forge

@@ -1,10 +1,10 @@
 import numpy as np
-from yoeo.comparisons.autoencoder import get_autoencoder
-from yoeo.comparisons.loftup.upsamplers import norm
-from yoeo.comparisons.loftup.featurizers import get_featurizer
+from vulture.models.external.autoencoder import get_autoencoder
+from vulture.comparisons.loftup.upsamplers import norm
+from vulture.comparisons.loftup.featurizers import get_featurizer
 
-from yoeo.comparisons.online_denoiser import Denoiser
-from yoeo.datasets.learn_remap_LU_feats import train, apply, vis
+from vulture.models.external.online_denoiser import Denoiser
+from vulture.datasets.learn_remap_LU_feats import train, apply, vis
 
 import torch
 import torch.nn.functional as F
@@ -33,10 +33,10 @@ model, patch_size, dim = get_featurizer(featurizer_class)
 model = model.to(DEVICE)
 
 denoiser = Denoiser(feat_dim=384).to(DEVICE)
-denoiser_weights = torch.load("yoeo/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
+denoiser_weights = torch.load("vulture/comparisons/vit_small_patch14_reg4_dinov2.lvd142m.pth")
 denoiser.load_state_dict(denoiser_weights["denoiser"])
 
-autoencoder = get_autoencoder("trained_models/dac_dv2_denoised_e500.pth", DEVICE)
+autoencoder = get_autoencoder("trained_models/dac_dv2_denoised_e500.pth", None, DEVICE)
 
 
 kernel_size = patch_size

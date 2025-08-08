@@ -7,7 +7,7 @@ from os import listdir
 from PIL import Image
 from featup.train_implicit_upsampler import my_app
 
-from yoeo.utils import do_2D_pca, to_numpy, do_pca
+from vulture.utils import do_2D_pca, to_numpy, do_pca
 
 torch.manual_seed(1001)
 

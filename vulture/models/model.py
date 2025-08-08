@@ -5,8 +5,8 @@ import torch.utils.benchmark as benchmark
 import numpy as np
 from math import log2, floor, ceil
 
-from yoeo.models.layers import DoubleConv, Up, Down
-from yoeo.utils import measure_mem_time, get_n_params
+from vulture.models.layers import DoubleConv, Up, Down
+from vulture.utils import measure_mem_time, get_n_params
 
 from typing import Literal
 from dataclasses import dataclass

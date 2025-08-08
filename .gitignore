@@ -169,7 +169,7 @@ sample-images/
 data/
 out/
 experiments/
-trained_models/
+trained_models*
 paper/
 paper_figures/fig_out/*
 

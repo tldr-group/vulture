@@ -1,8 +1,8 @@
 from torch import no_grad
 from PIL import Image
 
-from yoeo import CompleteUpsampler
-from yoeo.utils import vis
+from vulture import CompleteUpsampler
+from vulture.utils import vis
 
 # Data source:
 # 'Cast iron with magnesium induced spheroidised graphite', Cambridge DoITPoMS, Dr R F Cochrane

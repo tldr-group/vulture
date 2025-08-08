@@ -1,13 +1,13 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-from torchvision.transforms import functional as TF
+from torchvision.transforms import functional as TF  # type: ignore
 from os import listdir
 from PIL import Image
 from typing import Literal
 
-# from yoeo.datasets.learn_remap_LU_feats import apply
-from yoeo.utils import visualise, Experiment
+# from vulture.datasets.learn_remap_LU_feats import apply
+from vulture.utils import visualise, Experiment
 
 
 import warnings

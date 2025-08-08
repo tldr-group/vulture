@@ -3,16 +3,16 @@ import torch
 import numpy as np
 from PIL import Image
 
-from yoeo.main import (
+from vulture.main import (
     get_hr_feats,
     get_lr_feats,
     convert_image,
     closest_crop,
     Experiment,
 )
-from yoeo.models import FeatureUpsampler
-from yoeo.utils import to_numpy
-from yoeo.feature_prep import PCAUnprojector
+from vulture.models import FeatureUpsampler
+from vulture.utils import to_numpy
+from vulture.feature_prep import PCAUnprojector
 
 from os import listdir, makedirs
 from shutil import rmtree
