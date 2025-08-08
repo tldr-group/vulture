@@ -8,7 +8,7 @@ from shutil import copy
 from vulture.datasets import EmbeddingDataset, DataLoader, unnorm
 from vulture.models import FeatureUpsampler
 from vulture.models.model import init_weights
-from vulture.utils import visualise, plot_losses, expriment_from_json
+from vulture.utils import config_from_expriment, visualise, plot_losses, expriment_from_json
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -140,7 +140,9 @@ for i in range(N_EPOCHS):
     # scheduler.step(val_loss)
     if i % SAVE_PER == 0:
         vis(net, val_dl)
-        if val_loss < best_val_loss:
-            # todo: just save every 100 epochs?
-            torch.save(net.state_dict(), f"{OUT_PATH}/best.pth")
-            best_val_loss = val_loss
+
+    if val_loss < best_val_loss:
+        obj = {"weights": net.state_dict(), "config": config_from_expriment(expr)}
+        # todo: just save every 100 epochs?
+        torch.save(net.state_dict(), f"{OUT_PATH}/best.pth")
+        best_val_loss = val_loss

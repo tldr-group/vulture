@@ -63,6 +63,30 @@ class Experiment:
     weights_init: InitTypes = "default"
 
 
+@dataclass
+class UpsamplerConfig:
+    name: str
+    # conv kernel size
+    k: int = 3
+    # number of input channels: 384 for full Dv2, 128/64/32 for Featup PCA'd inputs
+    n_ch_in: int = 128
+    # number of hidden channels: -1 means same as input
+    n_ch_hidden: int = -1
+    # number of output channels: usually same as n_ch)in
+    n_ch_out: int = 128
+    # number of 'guidance' channels (i.e channel dim of image)
+    n_ch_guidance: int = 3
+    # number of hidden dims in downsampler (usally 64 or 32)
+    n_ch_downsampler: int = 64
+    # if resizing and adding in original features during upsampling - not used
+    feat_weight: float = -1
+    # vit model patch size (usually 14)
+    patch_size: int = 14
+    padding_mode: Literal["zeros", "reflect", "replicate", "circular"] = "zeros"
+    # Weights init
+    weights_init: InitTypes = "default"
+
+
 def expriment_from_json(json_obj_or_path: dict | str) -> Experiment:
     config: dict
     if isinstance(json_obj_or_path, str):
@@ -74,10 +98,14 @@ def expriment_from_json(json_obj_or_path: dict | str) -> Experiment:
         for subkey, subval in config[key].items():
             config[subkey] = subval
         config.pop(key)
-    config["net_type"] = config["type"]
-    config.pop("type")
+    # config["net_type"] = config["type"]
+    # config.pop("type")
 
     return Experiment(**config)
+
+
+def config_from_expriment(expr: Experiment) -> UpsamplerConfig:
+    return UpsamplerConfig(**{k: v for k, v in expr.__dict__.items() if k in UpsamplerConfig.__dataclass_fields__})
 
 
 def get_n_params(net: nn.Module) -> int:
