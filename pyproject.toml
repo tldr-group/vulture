@@ -47,7 +47,7 @@ dev = [
 
 
 [tool.setuptools]
-packages = ["vulture", "vulture.models"]
+packages = ["vulture", "vulture.models", "vulture.models.external"]
 
 [tool.uv.sources]
 torch = [

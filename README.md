@@ -5,12 +5,11 @@
 
 Convolutional upsampling of DINOv2 [1] features for weakly supervised segmentation [2].
 In short, we train a bisected U-net to upsample low-resolution features by targeting high-resolution ground truths generated from other methods (_i.e,_ FeatUp [3], LoftUp [4]) which may not scale as nicely in time / memory / generalisability as CNNs.
-They can they be used in Weka-style [5] feature-based / interactive / weakly supervised segmentation. 
+They can they be used in Weka-style [5] feature-based / interactive / weakly supervised segmentation.
 Check out the [examples](examples/) to get started!
 
 ## TODO:
 
-- update gui to use new strucutre
 - zenodo for fig data
 
 ## Contents
@@ -114,7 +113,7 @@ vulture/
 │  ├─ configs/ # JSONs for training run parameters
 │  ├─ external/ # external models used
 │  │  ├─ autoencoder.py # compresses low-res DINOv2 features
-│  │  ├─ online_denoiser.py # 'denoises' low-res ViT features - from [5]
+│  │  ├─ online_denoiser.py # 'denoises' low-res ViT features - from [6]
 │  │  └─ vit_wrapper.py # wrapper around DINOv2 for low-res features
 │  ├─ layers.py # (u-net) layer components for our down-/upsampler
 │  └─ model.py # down-/upsampler architecture
