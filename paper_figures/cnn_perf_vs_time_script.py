@@ -17,6 +17,12 @@ encoder: str = "resnet50"
 pretrained_weights: str = "micronet"
 sparse: bool = False
 
+
+n_epochs = 34
+# for full run needs to be 200
+save_per = 1
+N_REPEATS = 1
+
 class_values = {
     "matrix": [85, 85, 85],
     "secondary": [170, 170, 170],
@@ -46,12 +52,7 @@ default_loss = pmm.losses.DiceBCELoss(weight=0.7)
 loss = masked_loss if sparse else default_loss
 
 
-n_epochs = 250
-# for full run needs to be 200
-save_per = 2
-N_REPEATS = 10
-
-print(f"{n_epochs} epochs, save {save_per}, {N_REPEATS} repeats")
+print(f"{n_epochs} epochs, save {save_per}, {N_REPEATS} repeats, sparse: {sparse}")
 
 results = []
 for i in range(N_REPEATS):
