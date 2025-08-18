@@ -12,7 +12,14 @@ from timm import create_model
 from timm.data import create_transform, resolve_model_data_config
 from timm.models.vision_transformer import VisionTransformer, Attention, Block
 
-from flash_attn import flash_attn_qkvpacked_func
+FLASH_ATTN_INSTALLED = False
+try:
+    from flash_attn import flash_attn_qkvpacked_func
+
+    FLASH_ATTN_INSTALLED = True
+except ImportError:
+    pass
+
 
 import re
 from typing import cast
@@ -67,6 +74,9 @@ class Patch:
 
 
 def add_flash_attention(model: VisionTransformer) -> VisionTransformer:
+    if FLASH_ATTN_INSTALLED is False:
+        print("Warning: no flash attn available")
+        return model
     blk: Block
     for blk in model.blocks:  # type: ignore
         blk.attn.forward = MethodType(Patch.add_flash_attn(), blk.attn)
