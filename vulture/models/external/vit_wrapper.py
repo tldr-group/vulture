@@ -9,7 +9,8 @@ import torch
 from torch import nn
 from torchvision import transforms
 from timm import create_model
-from timm.data import create_transform, resolve_model_data_config
+
+from timm.data import create_transform, resolve_data_config
 from timm.models.vision_transformer import VisionTransformer, Attention, Block
 
 FLASH_ATTN_INSTALLED = False
@@ -159,7 +160,8 @@ class PretrainedViTWrapper(nn.Module):
         )
         # Different models have different data configurations
         # e.g., their training resolution, normalization, etc, are different
-        data_config = resolve_model_data_config(model=model)
+        # data_config = resolve_model_data_config(model=model)
+        data_config = resolve_data_config(model=model)
         img_transforms = cast(transforms.Compose, create_transform(**data_config, is_training=False))
 
         if is_fit3D:
