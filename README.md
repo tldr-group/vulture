@@ -71,6 +71,7 @@ In an 'Anaconda Powershell Prompt' (search in start menu)
 ```powershell
 conda env create -f install\conda.yml
 conda activate vulture
+pip install -e . --no-deps
 ```
 
 Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AILab/flash-attention/issues/595) to build on windows.
