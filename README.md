@@ -30,7 +30,7 @@ Note: you'll need `nvcc` installed to install flash-attn. See [`install/INSTALL_
 Either
 
 ```bash
-conda env create -f install/conda.yaml
+conda env create -f install/conda.yml
 conda activate vulture
 pip install . --no-deps
 # Force MAX_JOBS to avoid FA hogging all the cores; --no-build-isolation s.t it can find CUDA & nvcc
@@ -69,8 +69,16 @@ MAX_JOBS=4 pip install flash-attn --no-build-isolation
 In an 'Anaconda Powershell Prompt' (search in start menu)
 
 ```powershell
-conda env create -f install\conda.yaml
+conda env create -f install\conda.yml
 conda activate vulture
+pip install -e . --no-deps
+```
+
+or
+
+```bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv sync
 ```
 
 Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AILab/flash-attention/issues/595) to build on windows.

@@ -208,7 +208,7 @@ def get_lr_feats(
     lr_feats = project(imgs[0], model, fit3d)
 
     if existing_pca:
-        return existing_pca.project(lr_feats)
+        return existing_pca.project(lr_feats), existing_pca
 
     jit_features: list[torch.Tensor] = []
     for transformed_image, _ in loader:
