@@ -9,7 +9,7 @@ $HF_TOKEN = "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"
 New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 
 
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
+$headers = @{ Authorization = "Bearer $HF_TOKEN" }
 $response = (Invoke-RestMethod "https://huggingface.co/api/models/$Username/$ModelId" -Headers $headers)
 $files = $response.siblings.rfilename | Where-Object { $_ -match '\.pth$' }
 
