@@ -41,6 +41,9 @@ paper = [
   "pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models"
 ]
 
+[tool.uv.extra-build-dependencies]
+featup = ["torch"]
+
 [project.urls]
 "Homepage" = "https://github.com/tldr-group/vulture"
 "Bug Tracker" = "https://github.com/tldr-group/vulture/issues"
