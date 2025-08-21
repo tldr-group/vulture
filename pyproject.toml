@@ -33,7 +33,7 @@ dependencies = [
   ]
 
 [project.optional-dependencies]
-dev = [
+paper = [
   "omegaconf>=2.3.0",
   "segmentation_models_pytorch",
   "albumentations",
