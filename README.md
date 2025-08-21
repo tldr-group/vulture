@@ -74,6 +74,13 @@ conda activate vulture
 pip install -e . --no-deps
 ```
 
+or
+
+```bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv sync
+```
+
 Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AILab/flash-attention/issues/595) to build on windows.
 
 ## Checkpoints
