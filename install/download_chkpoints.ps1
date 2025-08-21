@@ -19,5 +19,5 @@ foreach ($file in $files) {
     $outDir = Split-Path $outPath
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     Write-Host "Downloading $file ..."
-    Invoke-WebRequest -Uri $url -OutFile $outPath
+    Invoke-WebRequest -Uri $url -OutFile $outPath -Headers $headers
 }
