@@ -60,8 +60,9 @@ uv run apply.py
 The conda path comes with all the 'dev' dependencies (needed to reproduce the figures), if you want those with pip/uv/etc, run
 
 ```bash
-pip install '.[dev]'
-MAX_JOBS=4 pip install flash-attn --no-build-isolation
+pip install '.[paper]'
+# OR
+uv sync --extra paper
 ```
 
 ### Windows
@@ -74,7 +75,7 @@ conda activate vulture
 pip install -e . --no-deps
 ```
 
-or
+or (recommended)
 
 ```bash
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
@@ -82,6 +83,34 @@ uv sync
 ```
 
 Note: flash-attn doesn't build/[requires extra steps](https://github.com/Dao-AILab/flash-attention/issues/595) to build on windows.
+
+### Installing the GUI:
+
+You need to perform the following steps:
+
+1. Clone the repo
+2. Copy the trained models from this folder into a new `trained_models` folder (note: you'll need to download the [checkpoints](#checkpoints) first)
+3. Activate your environment (conda/pip/uv) that has `vulture` installed
+4. Run the GUI
+
+```bash
+git clone https://github.com/tldr-group/interactive-seg-gui
+mkdir interactive-seg-gui/trained_models
+cp -r trained_models/ interactive-seg-gui/trained_models/
+cd interactive-seg-gui
+# activate your venv with vulture installed in it either via conda or .venv and run
+python main.py
+# OR using uv:
+uv run --project ..\vulture\ main.py
+```
+
+```powershell
+git clone https://github.com/tldr-group/interactive-seg-gui
+mkdir -p interactive-seg-gui\trained_models
+Copy-Item trained_models\ interactive-seg-gui\trained_models\ -Recurse
+Set-Location interactive-seg-gui
+python main.py
+```
 
 ## Checkpoints
 
