@@ -21,6 +21,7 @@ dependencies = [
   "torchvision",
   "torchmetrics>=0.10.3",
   "timm>=1.0.9",
+  "xgboost>=2.1.0",
   "numpy>=1.26.4",
   "scikit-learn>=1.6.1",
   "pillow>=11.2.0",
@@ -28,23 +29,26 @@ dependencies = [
   "tifffile>=2025.3.30",
   "matplotlib>=3.10.0",
   "ninja>=1.11.1.1",
-  "packaging",
   "interactive-seg-backend@git+https://github.com/tldr-group/interactive-seg-backend"
   ]
 
 [project.optional-dependencies]
-dev = [
+paper = [
   "omegaconf>=2.3.0",
   "segmentation_models_pytorch",
   "albumentations",
   "featup@git+https://github.com/mhamilton723/FeatUp",
-  "pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models"
-]
+  "pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models",
+  "PyWavelets",
+  "ipykernel"
+  ]
+
+[tool.uv.extra-build-dependencies]
+featup = ["torch"]
 
 [project.urls]
 "Homepage" = "https://github.com/tldr-group/vulture"
 "Bug Tracker" = "https://github.com/tldr-group/vulture/issues"
-
 
 [tool.setuptools]
 packages = ["vulture", "vulture.models", "vulture.models.external"]
@@ -56,3 +60,15 @@ torch = [
 torchvision = [
   { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
+featup = [{ index = "pypi", ignore-deps = true },]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true          # everything else comes from PyPI
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true         # only packages explicitly pinned to this index
+

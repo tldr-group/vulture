@@ -9,7 +9,7 @@ $HF_TOKEN = "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"
 New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
 
 
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
+$headers = @{ Authorization = "Bearer $HF_TOKEN" }
 $response = (Invoke-RestMethod "https://huggingface.co/api/models/$Username/$ModelId" -Headers $headers)
 $files = $response.siblings.rfilename | Where-Object { $_ -match '\.pth$' }
 
@@ -19,5 +19,5 @@ foreach ($file in $files) {
     $outDir = Split-Path $outPath
     New-Item -ItemType Directory -Force -Path $outDir | Out-Null
     Write-Host "Downloading $file ..."
-    Invoke-WebRequest -Uri $url -OutFile $outPath
+    Invoke-WebRequest -Uri $url -OutFile $outPath -Headers $headers
 }
