@@ -2,6 +2,7 @@
 
 [![arXiv](https://img.shields.io/badge/arXiv-2508.21529-b31b1b.svg)](https://arxiv.org/abs/2508.21529)
 [![Huggingface](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-checkpoints-orange)](https://huggingface.co/rmdocherty/vulture)
+[![zenodo](https://img.shields.io/badge/zenodo-10.5281-blue)](https://zenodo.org/records/16993498)
 
 Convolutional upsampling of DINOv2 [1] features for weakly supervised segmentation [2].
 In short, we train a bisected U-net to upsample low-resolution features by targeting high-resolution ground truths generated from other methods (_i.e,_ FeatUp [3], LoftUp [4]) which may not scale as nicely in time / memory / generalisability as CNNs.
