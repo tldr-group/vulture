@@ -9,6 +9,10 @@ In short, we train a bisected U-net to upsample low-resolution features by targe
 They can they be used in Weka-style [5] feature-based / interactive / weakly supervised segmentation.
 Check out the [examples](examples/) to get started!
 
+<p align="center">
+    <img src="https://sambasegment.blob.core.windows.net/resources/method_full_.png">
+</p>
+
 ## Contents
 
 - [Installation](#installation)
