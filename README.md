@@ -1,16 +1,12 @@
 # vulture
 
-[![arXiv](https://img.shields.io/badge/arXiv-1234.56789-b31b1b.svg)](https://arxiv.org/abs/1234.56789)
+[![arXiv](https://img.shields.io/badge/arXiv-2508.21529-b31b1b.svg)](https://arxiv.org/abs/2508.21529)
 [![Huggingface](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-checkpoints-orange)](https://huggingface.co/rmdocherty/vulture)
 
 Convolutional upsampling of DINOv2 [1] features for weakly supervised segmentation [2].
 In short, we train a bisected U-net to upsample low-resolution features by targeting high-resolution ground truths generated from other methods (_i.e,_ FeatUp [3], LoftUp [4]) which may not scale as nicely in time / memory / generalisability as CNNs.
 They can they be used in Weka-style [5] feature-based / interactive / weakly supervised segmentation.
 Check out the [examples](examples/) to get started!
-
-## TODO:
-
-- zenodo for fig data
 
 ## Contents
 
@@ -30,6 +26,7 @@ Note: you'll need `nvcc` installed to install flash-attn. See [`install/INSTALL_
 Either
 
 ```bash
+git clone https://github.com/tldr-group/vulture
 conda env create -f install/conda.yml
 conda activate vulture
 pip install . --no-deps
@@ -40,6 +37,7 @@ MAX_JOBS=4 pip install --no-build-isolation flash-attn
 or
 
 ```bash
+git clone https://github.com/tldr-group/vulture
 python -m venv .venv
 source .venv/bin/activate
 pip install .
@@ -50,6 +48,7 @@ python apply.py
 or
 
 ```bash
+git clone https://github.com/tldr-group/vulture
 curl -LsSf https://astral.sh/uv/install.sh | sh # install uv
 uv sync
 # update .env if we need to change CUDA_HOME / LD_LIBRARY_PATH later
@@ -57,7 +56,7 @@ uv run --env-file install/.env -- pip install --no-build-isolation flash-attn
 uv run apply.py
 ```
 
-The conda path comes with all the 'dev' dependencies (needed to reproduce the figures), if you want those with pip/uv/etc, run
+The conda path comes with all the 'paper' dependencies (needed to reproduce the figures), if you want those with pip/uv/etc, run
 
 ```bash
 pip install '.[paper]'
@@ -93,6 +92,8 @@ You need to perform the following steps:
 3. Activate your environment (conda/pip/uv) that has `vulture` installed
 4. Run the GUI
 
+#### Ubuntu:
+
 ```bash
 git clone https://github.com/tldr-group/interactive-seg-gui
 mkdir interactive-seg-gui/trained_models
@@ -103,6 +104,8 @@ python main.py
 # OR using uv:
 uv run --project ..\vulture\ main.py
 ```
+
+#### Windows:
 
 ```powershell
 git clone https://github.com/tldr-group/interactive-seg-gui
@@ -162,6 +165,19 @@ vulture/
 ```
 
 ## Citation
+
+```
+@article{docherty2025maybedontneedunet,
+      title={Maybe you don't need a U-Net: convolutional feature upsampling for materials micrograph segmentation},
+      author={Ronan Docherty and Antonis Vamvakeros and Samuel J. Cooper},
+      year={2025},
+      journal={arXiv prerprint, arXiv:2508.21529}
+      eprint={2508.21529},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2508.21529},
+}
+```
 
 ## Contact
 
