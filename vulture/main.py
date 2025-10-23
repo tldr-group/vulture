@@ -21,7 +21,11 @@ from vulture.models import (
     MODEL_MAP,
     FeatureType,
 )
-from vulture.feature_prep import get_lr_feats, PCAUnprojector, get_lr_featup_feats_and_pca
+from vulture.feature_prep import (
+    get_lr_feats,
+    PCAUnprojector,
+    get_lr_featup_feats_and_pca,
+)
 from vulture.utils import (
     expriment_from_json,
     closest_crop,
@@ -31,8 +35,20 @@ from vulture.utils import (
 
 
 def transform_image(
-    image: np.ndarray | Image.Image | torch.Tensor, device: str, to_half: bool = False
+    image: np.ndarray | Image.Image | torch.Tensor, device: str, to_half: bool = False, patch_size: int = 14
 ) -> tuple[torch.Tensor, torch.Tensor]:
+    """Take input image and transform for both original feature model (closest crop to multiple of patch length, norm)
+    and for upsampler image (norm).
+
+    Args:
+        image (np.ndarray | Image.Image | torch.Tensor): image whose features we wish to upsample
+        device (str): CUDA device string
+        to_half (bool, optional): put image in half precision. Defaults to False.
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]: transformed image for feature model, transformed image for upsampler
+            These are both (1,C,H,W).
+    """
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image).convert("RGB")
 
@@ -43,9 +59,14 @@ def transform_image(
         _h, _w = image.height, image.width
         batch = True
 
-    tr = closest_crop(_h, _w)
+    tr = closest_crop(_h, _w, patch_size=patch_size)
     lr_feat_input_img = convert_image(
-        image, tr, batch=batch, to_gpu=device != "cpu", device_str=device, to_half=to_half
+        image,
+        tr,
+        batch=batch,
+        to_gpu=device != "cpu",
+        device_str=device,
+        to_half=to_half,
     )
 
     upsampler_input_img = (
@@ -73,6 +94,26 @@ class CompleteUpsampler(nn.Module):
         to_eval: bool = False,
         to_half: bool = False,
     ) -> None:
+        """Feature upsampler wrapper class.
+
+        Args:
+            feature_type (FeatureType): which featureset to use when upsampling. One of "FEATUP" (trained to match HR
+                featup-implict ground truths [1]) or "LOFTUP"/"LOFTUP" [2] (compressed=compressed via supplied autoencoder)
+            chk_or_cfg (str | UpsamplerConfig): path to .pt checkpoint (which should contain the upsampler config as a json
+                alongside weights), or UpsamplerConfig for fresh model
+            denoiser_chk (str | None, optional): path to .pt checkpoint of feature denoiser from [3]. Defaults to None.
+            autoencoder_chk_or_cfg (str | AutoencoderConfig | None, optional): path to .pt checkpoint of autoencoder feature
+                compressor (again must contain config alongside weights). The autoencoder needs to be trained for each low-res
+                featureset you wish to uspample. Defaults to None.
+            device (str, optional): CUDA device string to load model(s) onto. Defaults to "cpu".
+            add_flash_attn (bool, optional): whether to add flash attention to the base feature model. Defaults to True.
+            to_eval (bool, optional): put model(s) in eval mode. Defaults to False.
+            to_half (bool, optional): put model(s) in half precision. Required for flash-attention. Defaults to False.
+
+        - [1] S. Fu _et al._, "FeatUp: A Model-Agnostic Framework for Features at Any Resolution" (2024), ICLR, https://arxiv.org/abs/2403.10516
+        - [2] H. Huang _et al._, "LoftUp: A Coordinate-Based Feature Upsampler for Vision Foundation Models", ICCV, https://arxiv.org/abs/2504.14032
+        - [3] J. Yang _et al._, "Denoising Vision Transformers" (2024), ECCV, https://arxiv.org/abs/2401.02957
+        """
         super().__init__()
         self.feature_type: FeatureType = feature_type
         # Load base DINOv2 model
@@ -104,7 +145,19 @@ class CompleteUpsampler(nn.Module):
         self.to_half = to_half
 
     def transform_image(self, image: np.ndarray | Image.Image | torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        return transform_image(image, self.device, self.to_half)
+        """Take input image and transform for both original feature model (closest crop to multiple of patch length, norm)
+        and for upsampler image (norm).
+
+        Args:
+            image (np.ndarray | Image.Image | torch.Tensor): image whose features we wish to upsample
+            device (str): CUDA device string
+            to_half (bool, optional): put image in half precision. Defaults to False.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: transformed image for feature model, transformed image for upsampler.
+                These are (1,C,H,W).
+        """
+        return transform_image(image, self.device, self.to_half, self.dv2_model.patch_size)
 
     def get_lr_feats(
         self,
@@ -112,7 +165,39 @@ class CompleteUpsampler(nn.Module):
         output_norm: bool = True,
         transform_input: bool = True,
         existing_pca: PCAUnprojector | None = None,
+        n_imgs_pca: int = 50,
+        n_batch: int = 50,
     ) -> torch.Tensor:
+        """Get low-res features from base feature model for image. This does one of the following (based on $self.feature_type):
+
+        FEATUP: compute shared PCA of features (from, say, DINOv2) of jittered (small transforms: pads, zooms, flips) of input
+            image down to $k dimensions (usually 128, 64 or 32) -> $PCA. Compute features from base feature model -> $F then
+            apply $PCA to $F to get $F'. Return $F', which is (1, $k, N_th, N_tw)
+        LOFTUP: get features $F from base feature model, apply feature denoiser [3], return $F' which is (1, D, N_th, N_tw)
+        LOFTUP_COMPRESSED: get features $F from base feature model, apply feature denoiser [3], compress with autoencoder to
+            $k dims (usually 48). Return $F' which is (1, $k, N_th, N_tw)
+
+        Terms:
+            D = hidden dimension of base feature model (384 for ViT-S / DINOv2-ViT-S)
+            N_th/w = number of patch tokens in the height/width dimension. These are height // patch_size and width // patch_size
+                for the transform of the image (closest crop).
+
+        Args:
+            image (np.ndarray | Image.Image | torch.Tensor): input image. Can be already_transformed if $transform_input=False
+            output_norm (bool, optional): whether to apply L1 norm to output. Defaults to True.
+            transform_input (bool, optional): whether to transform the input (i.e closest crop). Defaults to True.
+            existing_pca (PCAUnprojector | None, optional): existing $PCA that can be supplied instead of computing from scratch.
+                Useful if applying over batch of images. Only needed for FEATUP. Defaults to None.
+            n_imgs_pca (int, optional): number of transforms to use in FEATUP shared PCA. Defaults to 50.
+            n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
+                into memory issues for large images. Defaults to 50.
+
+        Raises:
+            Exception: if invalid feature type supplied
+
+        Returns:
+            torch.Tensor: low-res features for upsampling, shape (1, n, N_th, N_tw)
+        """
         if transform_input:
             lr_feat_input_img, _ = self.transform_image(image)
         else:
@@ -123,7 +208,12 @@ class CompleteUpsampler(nn.Module):
             case "FEATUP":
                 k = self.upsampler.n_ch_in
                 lr_feats, _ = get_lr_featup_feats_and_pca(
-                    self.dv2_model, [lr_feat_input_img], n_feats_in=k, existing_pca=existing_pca
+                    self.dv2_model,
+                    [lr_feat_input_img],
+                    n_feats_in=k,
+                    existing_pca=existing_pca,
+                    n_imgs=n_imgs_pca,
+                    n_batch=n_batch,
                 )
             case "LOFTUP_FULL":
                 assert self.denoiser is not None
@@ -144,17 +234,49 @@ class CompleteUpsampler(nn.Module):
         return lr_feats
 
     def get_hr_feats(
-        self, upsampler_img: torch.Tensor, lr_feats: torch.Tensor, cast_to: torch.dtype = torch.float32
+        self,
+        upsampler_img: torch.Tensor,
+        lr_feats: torch.Tensor,
+        cast_to: torch.dtype = torch.float32,
     ) -> torch.Tensor:
+        """Get upsampled features for input image $upsampler_img and low-res features $lr_feats.
+
+        Args:
+            upsampler_img (torch.Tensor): (1, C, H, W) image
+            lr_feats (torch.Tensor): (1, n, N_th, N_tw) low-res feautres of image
+            cast_to (torch.dtype, optional): output type of high-res-features. Defaults to torch.float32.
+
+        Returns:
+            torch.Tensor: (1, n, H, W) high-res features
+        """
         with torch.autocast(self.device, cast_to):
-            hr_feats = self.upsampler(upsampler_img, lr_feats)
+            hr_feats = self.upsampler.forward(upsampler_img, lr_feats)
         return hr_feats
 
     def forward(
-        self, image: np.ndarray | Image.Image | torch.Tensor, existing_pca: PCAUnprojector | None = None
+        self,
+        image: np.ndarray | Image.Image | torch.Tensor,
+        existing_pca: PCAUnprojector | None = None,
+        n_imgs_pca: int = 50,
+        n_batch: int = 50,
     ) -> torch.Tensor:
+        """Get upsampled features for input image $upsampler_img, computing low-res features first.
+
+        Args:
+            image (np.ndarray | Image.Image | torch.Tensor): input image. Can be already_transformed if $transform_input=False
+            existing_pca (PCAUnprojector | None, optional): existing $PCA that can be supplied instead of computing from scratch.
+                Useful if applying over batch of images. Only needed for FEATUP. Defaults to None.
+            n_imgs_pca (int, optional): number of transforms to use in FEATUP shared PCA. Defaults to 50.
+            n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
+                into memory issues for large images. Defaults to 50.
+
+        Returns:
+            torch.Tensor: (1, n, H, W) high-res features
+        """
         lr_feat_input_img, upsampler_input_img = self.transform_image(image)
-        lr_feats = self.get_lr_feats(lr_feat_input_img, True, False, existing_pca=existing_pca)
+        lr_feats = self.get_lr_feats(
+            lr_feat_input_img, True, False, existing_pca=existing_pca, n_imgs_pca=n_imgs_pca, n_batch=n_batch
+        )
         dtype = torch.float16 if self.device else torch.float32
         return self.get_hr_feats(upsampler_input_img, lr_feats, dtype)
 

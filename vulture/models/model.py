@@ -78,6 +78,16 @@ class LearnedDownsampler(nn.Module):
         self.downsample_layers = nn.ModuleList(layers)
 
     def forward(self, img: torch.Tensor) -> list[torch.Tensor]:
+        """For an input image $img, create list of learned downsamples (inc. original) i.e
+        x -> layer(x) -> downsampled by 1/2 -> layer(x).
+
+        Args:
+            img (torch.Tensor): (B,C,H,W) image to get downsamples of
+
+        Returns:
+            list[torch.Tensor]: [(B,$n_chin_in,H,W), (B,$n_ch_out,H/2,W/2), ..., (B,$n_ch_out,H/$patch_size,W/$patch_size)]
+                list of image based guidance for the upsampler to use later.
+        """
         _, _, H, W = img.shape
         out_h, out_w = floor(H / self.patch_size), floor(W / self.patch_size)
         downsamples: list[torch.Tensor] = []

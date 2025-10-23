@@ -234,6 +234,33 @@ def get_lr_featup_feats_and_pca(
     n_batch: int = 50,
     existing_pca: PCAUnprojector | None = None,
 ) -> tuple[torch.Tensor, PCAUnprojector]:
+    """Get low-res base feature model (DINOv2) features projected onto down to $n_feats_in dimensions
+    across a shared PCA of features of transformations of the image. This is so our low-res features
+    match the distribution of the high-res Featup-implict ground truths that were used to train the
+    upsampler.
+
+    Explictly:
+        1) compute $n_imgs transformations of $imgs, which are pads, zooms and flips.
+        2) compute DINOv2 features for each transformation -> (B, D, N_th, N_tw)
+        3) compute shared PCA of (flattened) features of these transfromations down
+            to $n_feats_in dims
+        4) compute DINOv2 features for the first img in $imags
+        5) apply this PCA to the feautres in 4) to get (1, $n_feats_in, N_th, N_tw)
+        6) return
+
+    Args:
+        model (PretrainedViTWrapper): base feature model (i.e DINOv2) with a forward_features method
+        imgs (list[torch.Tensor]): images shape (1, C, H, W) we want to compute the shared PCA over
+        n_imgs (int, optional): umber of transforms to use in FEATUP shared PCA. Defaults to 50.
+        n_feats_in (int, optional): dimension to project features down to. Defaults to 128.
+        n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
+            into memory issues for large images. Defaults to 50.
+        existing_pca (PCAUnprojector | None, optional): if supplied, compute base model features for image,
+            project using this pca and return (i.e don't compute shared PCA). Defaults to None.
+
+    Returns:
+        tuple[torch.Tensor, PCAUnprojector]: (1, $n_feats_in, N_th, N_tw) low-res features & computed PCA
+    """
     cfg_n_images = min(n_imgs * len(imgs), 50)  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
