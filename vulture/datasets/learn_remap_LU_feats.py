@@ -6,10 +6,9 @@ import numpy as np
 
 from PIL import Image
 
-from vulture.comparisons.loftup.featurizers.util import get_featurizer
-from vulture.models.external.online_denoiser import Denoiser
-from vulture.models.external.autoencoder import get_autoencoder
 from vulture.utils import do_2D_pca
+
+
 import matplotlib.pyplot as plt
 
 
@@ -112,6 +111,10 @@ def vis(
 
 
 if __name__ == "__main__":
+    from vulture.comparisons.loftup.featurizers.util import get_featurizer
+    from vulture.models.external.online_denoiser import Denoiser
+    from vulture.models.external.autoencoder import get_autoencoder
+
     PATH = "data/imagenet_reduced"
     DATA_FOLDER = "data_lu_reg"
 

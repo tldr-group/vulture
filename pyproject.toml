@@ -51,7 +51,7 @@ featup = ["torch"]
 "Bug Tracker" = "https://github.com/tldr-group/vulture/issues"
 
 [tool.setuptools]
-packages = ["vulture", "vulture.models", "vulture.models.external"]
+packages = ["vulture", "vulture.models", "vulture.models.external", "vulture.comparisons"]
 
 [tool.uv.sources]
 torch = [
