@@ -7,6 +7,7 @@ from PIL import Image
 
 import numpy as np
 
+from vulture.models.external.alibi_vit_wrapper import AlibiVitWrapper
 from vulture.models.external.vit_wrapper import add_flash_attention
 from vulture.models import (
     PretrainedViTWrapper,
@@ -89,6 +90,7 @@ class CompleteUpsampler(nn.Module):
         chk_or_cfg: str | UpsamplerConfig,
         denoiser_chk: str | None = None,
         autoencoder_chk_or_cfg: str | AutoencoderConfig | None = None,
+        dino_chk: str | None = None,
         device: str = "cpu",
         add_flash_attn: bool = True,
         to_eval: bool = False,
@@ -117,14 +119,22 @@ class CompleteUpsampler(nn.Module):
         super().__init__()
         self.feature_type: FeatureType = feature_type
         # Load base DINOv2 model
-        self.dv2_model = PretrainedViTWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
+        self.dv2_model: PretrainedViTWrapper
+        if feature_type == "ALIBI_COMPRESSED":
+            assert dino_chk is not None, "Must supply Alibi finetuned DINOv2 checkpoint"
+            self.dv2_model = AlibiVitWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
+            weights = torch.load(dino_chk, map_location=device, weights_only=True)
+            self.dv2_model.load_state_dict(weights)
+        else:
+            self.dv2_model = PretrainedViTWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
         self.denoiser: Denoiser | None = None
         self.autoencoder: Autoencoder | None = None
 
+        needs_denoiser = ("LOFTUP_FULL", "LOFTUP_COMPRESSED")
         # Load or initialise optional models
-        if denoiser_chk is None and feature_type != "FEATUP":
+        if denoiser_chk is None and feature_type in needs_denoiser:
             self.denoiser = get_denoiser(None, device, to_eval, to_half)
-        elif denoiser_chk is not None and feature_type != "FEATUP":
+        elif denoiser_chk is not None and feature_type in needs_denoiser:
             self.denoiser = get_denoiser(denoiser_chk, device, to_eval, to_half)
 
         if isinstance(autoencoder_chk_or_cfg, str):
@@ -226,6 +236,11 @@ class CompleteUpsampler(nn.Module):
                 denoised_feats = self.denoiser.forward_(dv2_feats)
                 denoised_feats = F.normalize(denoised_feats, p=1, dim=1)
                 lr_feats = self.autoencoder.encoder(denoised_feats)
+            case "ALIBI_COMPRESSED":
+                assert self.autoencoder is not None
+                dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                dv2_feats = F.normalize(dv2_feats, p=1, dim=1)
+                lr_feats = self.autoencoder.encoder(dv2_feats)
             case _:
                 raise Exception(f"Unsupported feature type {_}")
 

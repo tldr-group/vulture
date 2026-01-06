@@ -28,7 +28,7 @@ from types import MethodType
 from typing import Callable, Literal
 
 
-FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED"]
+FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED", "ALIBI_COMPRESSED"]
 FIT3D_DINOv2_REG_SMALL_URL = "https://huggingface.co/yuanwenyue/FiT3D/resolve/main/dinov2_reg_small_finetuned.pth"
 
 MODEL_LIST = [
@@ -43,6 +43,7 @@ MODEL_MAP: dict[FeatureType, str] = {
     "FEATUP": MODEL_LIST[2],
     "LOFTUP_FULL": MODEL_LIST[1],
     "LOFTUP_COMPRESSED": MODEL_LIST[1],
+    "ALIBI_COMPRESSED": MODEL_LIST[1],
 }
 
 
