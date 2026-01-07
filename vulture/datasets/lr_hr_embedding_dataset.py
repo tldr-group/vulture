@@ -33,8 +33,7 @@ class EmbeddingDataset(Dataset):
         expr: Experiment,
         using_splits: bool = True,
         device: str = "cuda:1",
-        data_suffix: Literal["", "_reg", "_fit_reg", "_lu_reg"] = "",
-        apply_mlp: bool = False,
+        data_suffix: Literal["", "_reg", "_fit_reg", "_lu_reg", "_jf_reg"] = "",
     ) -> None:
         super().__init__()
 
@@ -48,11 +47,6 @@ class EmbeddingDataset(Dataset):
         self.using_splits = using_splits
         self.img_dir = f"{self.root_dir}/splits" if using_splits else f"{self.root_dir}/imgs"
         self.expr = expr
-
-        # self.mlp = MLP(384, 384)
-        # self.mlp = self.mlp.to(self.device)
-
-        self.apply_mlp = apply_mlp
 
     def __len__(self):
         return self.n
@@ -93,6 +87,10 @@ class EmbeddingDataset(Dataset):
 
         img_tensor = img_tensor.to(torch.float32)
         img_tensor = TF.normalize(img_tensor, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+        if self.expr.load_size != 224:
+            img_tensor = TF.resize(img_tensor, [self.expr.load_size, self.expr.load_size])
+
         if self.expr.norm:
             lr_feats = F.normalize(lr_feats, p=1, dim=0)
             hr_feats = F.normalize(hr_feats, p=1, dim=0)
@@ -145,7 +143,7 @@ if __name__ == "__main__":
         "data/imagenet_reduced",
         "train",
         Experiment("test", n_ch_in=48, n_ch_out=48, norm=True),
-        data_suffix="_lu_reg",
+        data_suffix="_jf_reg",
         using_splits=False,
         device="cuda:1",
     )

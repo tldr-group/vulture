@@ -51,6 +51,7 @@ class Experiment:
     shift_dirs: list[tuple[int, int]] = field(default_factory=lambda: [])
     shift_dists: list[int] = field(default_factory=lambda: [])
     norm: bool = True
+    load_size: int = 224
 
     loss: Literal["smooth_l1", "l1", "l2"] = "smooth_l1"
     optim: Literal["adamw", "adam", "SGD"] = "adamw"
