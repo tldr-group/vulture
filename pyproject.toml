@@ -37,7 +37,7 @@ paper = [
   "segmentation_models_pytorch",
   "albumentations",
   # "featup@git+https://github.com/mhamilton723/FeatUp",
-  "pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models",
+  #"pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models",
   "PyWavelets",
   "ipykernel",
   "interactive-seg-backend@git+https://github.com/tldr-group/interactive-seg-backend"

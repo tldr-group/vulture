@@ -13,6 +13,12 @@ from timm import create_model
 from timm.data import create_transform, resolve_data_config
 from timm.models.vision_transformer import VisionTransformer, Attention, Block
 
+import re
+from typing import cast
+from types import MethodType
+from typing import Callable, Literal
+
+
 FLASH_ATTN_INSTALLED = False
 try:
     from flash_attn import flash_attn_qkvpacked_func
@@ -20,12 +26,6 @@ try:
     FLASH_ATTN_INSTALLED = True
 except ImportError:
     pass
-
-
-import re
-from typing import cast
-from types import MethodType
-from typing import Callable, Literal
 
 
 FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED", "ALIBI_COMPRESSED"]

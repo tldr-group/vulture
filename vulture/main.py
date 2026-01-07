@@ -1,4 +1,4 @@
-from typing import Any, Mapping
+from typing import Any, Mapping, Callable
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -34,8 +34,10 @@ from vulture.utils import (
     Experiment,
 )
 
+TransformFn = Callable[[np.ndarray | Image.Image | torch.Tensor, str, bool, int], tuple[torch.Tensor, torch.Tensor]]
 
-def transform_image(
+
+def default_image_transform(
     image: np.ndarray | Image.Image | torch.Tensor, device: str, to_half: bool = False, patch_size: int = 14
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Take input image and transform for both original feature model (closest crop to multiple of patch length, norm)
@@ -92,9 +94,10 @@ class CompleteUpsampler(nn.Module):
         autoencoder_chk_or_cfg: str | AutoencoderConfig | None = None,
         dino_chk: str | None = None,
         device: str = "cpu",
-        add_flash_attn: bool = True,
+        add_flash_attn: bool = False,
         to_eval: bool = False,
         to_half: bool = False,
+        transform_fn: TransformFn = default_image_transform,
     ) -> None:
         """Feature upsampler wrapper class.
 
@@ -153,8 +156,17 @@ class CompleteUpsampler(nn.Module):
         if self.to_eval:
             self = self.eval()
         self.to_half = to_half
+        if self.to_half:
+            self = self.half()
 
-    def transform_image(self, image: np.ndarray | Image.Image | torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.to_half is False and add_flash_attn is True:
+            raise Exception("Flash attention requires half precision. Set to_half=True.")
+
+        self.transform_fn = transform_fn
+
+    def transform_image(
+        self, image: np.ndarray | Image.Image | torch.Tensor, **kwargs
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Take input image and transform for both original feature model (closest crop to multiple of patch length, norm)
         and for upsampler image (norm).
 
@@ -167,7 +179,7 @@ class CompleteUpsampler(nn.Module):
             tuple[torch.Tensor, torch.Tensor]: transformed image for feature model, transformed image for upsampler.
                 These are (1,C,H,W).
         """
-        return transform_image(image, self.device, self.to_half, self.dv2_model.patch_size)
+        return self.transform_fn(image, self.device, self.to_half, self.dv2_model.patch_size, **kwargs)
 
     def get_lr_feats(
         self,
@@ -292,7 +304,7 @@ class CompleteUpsampler(nn.Module):
         lr_feats = self.get_lr_feats(
             lr_feat_input_img, True, False, existing_pca=existing_pca, n_imgs_pca=n_imgs_pca, n_batch=n_batch
         )
-        dtype = torch.float16 if self.device else torch.float32
+        dtype = torch.float16 if self.to_half else torch.float32
         return self.get_hr_feats(upsampler_input_img, lr_feats, dtype)
 
 
