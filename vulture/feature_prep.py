@@ -172,26 +172,11 @@ class JitteredImage(Dataset):
         )
 
 
-def project(x: torch.Tensor, model, fit3d: bool = False) -> torch.Tensor:
-    _, _, h, w = x.shape
-
-    n_patch_w: int = 1 + (w - 14) // 14
-    n_patch_h: int = 1 + (h - 14) // 14
-    if fit3d:
-        feats = model.forward_features(x)[:, 5:, :]
-    else:
-        feats = model.forward_features(x)["x_norm_patchtokens"]
-    b, _, c = feats.shape
-
-    return feats.permute((0, 2, 1)).reshape((b, c, n_patch_h, n_patch_w))
-
-
 @torch.no_grad()
 def get_lr_feats(
-    model,
+    model: PretrainedViTWrapper,
     imgs: list[torch.Tensor],
     n_imgs: int = 50,
-    fit3d: bool = False,
     n_feats_in: int = 128,
     n_batch: int = 50,
     existing_pca: PCAUnprojector | None = None,
@@ -205,14 +190,15 @@ def get_lr_feats(
 
     dataset = JitteredImage(imgs, cfg_n_images, cfg_use_flips, cfg_max_zoom, cfg_max_pad)
     loader = DataLoader(dataset, cfg_pca_batch)
-    lr_feats = project(imgs[0], model, fit3d)
+    lr_feats = model.forward_features(imgs[0], make_2D=True, add_reg=False)
 
     if existing_pca:
         return existing_pca.project(lr_feats), existing_pca
 
     jit_features: list[torch.Tensor] = []
     for transformed_image, _ in loader:
-        jit_features.append(project(transformed_image, model, fit3d))
+        tr_feats = model.forward_features(transformed_image, make_2D=True, add_reg=False)
+        jit_features.append(tr_feats)
     stacked_jit_features = torch.cat(jit_features, dim=0)
 
     pca = PCAUnprojector(
@@ -273,7 +259,7 @@ def get_lr_featup_feats_and_pca(
     lr_feats = model.forward_features(imgs[0], make_2D=True)
 
     if existing_pca:
-        return existing_pca.project(lr_feats)
+        return existing_pca.project(lr_feats), existing_pca
 
     jit_features: list[torch.Tensor] = []
     for transformed_image, _ in loader:
