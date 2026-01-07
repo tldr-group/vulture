@@ -126,10 +126,13 @@ class CompleteUpsampler(nn.Module):
         if feature_type == "ALIBI_COMPRESSED":
             assert dino_chk is not None, "Must supply Alibi finetuned DINOv2 checkpoint"
             self.dv2_model = AlibiVitWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
-            weights = torch.load(dino_chk, map_location=device, weights_only=True)
-            self.dv2_model.load_state_dict(weights)
         else:
             self.dv2_model = PretrainedViTWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
+        # Apply weights
+        if dino_chk is not None:
+            weights = torch.load(dino_chk, map_location=device, weights_only=True)
+            self.dv2_model.load_state_dict(weights)
+
         self.denoiser: Denoiser | None = None
         self.autoencoder: Autoencoder | None = None
 
