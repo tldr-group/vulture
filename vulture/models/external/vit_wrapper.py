@@ -57,11 +57,8 @@ class Patch:
         :rtype: Callable
         """
 
-        def forward(
-            self: Attention,
-            x: torch.Tensor,
-            attn_bias=None,
-        ) -> torch.Tensor:
+        # we add both attn_bias and attn_mask to align with old & new timm interfaces
+        def forward(self: Attention, x: torch.Tensor, attn_bias=None, attn_mask=None) -> torch.Tensor:
             # TODO: attn_bias -> attn_mask in new timm, find way to align these
             B, N, C = x.shape
             qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
