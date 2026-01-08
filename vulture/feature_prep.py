@@ -219,6 +219,7 @@ def get_lr_featup_feats_and_pca(
     n_feats_in: int = 128,
     n_batch: int = 50,
     existing_pca: PCAUnprojector | None = None,
+    apply_pca: bool = True,
 ) -> tuple[torch.Tensor, PCAUnprojector]:
     """Get low-res base feature model (DINOv2) features projected onto down to $n_feats_in dimensions
     across a shared PCA of features of transformations of the image. This is so our low-res features
@@ -258,7 +259,7 @@ def get_lr_featup_feats_and_pca(
     loader = DataLoader(dataset, cfg_pca_batch)
     lr_feats = model.forward_features(imgs[0], make_2D=True)
 
-    if existing_pca:
+    if existing_pca and apply_pca:
         return existing_pca.project(lr_feats), existing_pca
 
     jit_features: list[torch.Tensor] = []
@@ -273,7 +274,9 @@ def get_lr_featup_feats_and_pca(
         lr_feats.device,
         use_torch_pca=True,
     )
-    lr_feats = pca.project(lr_feats)
+
+    if apply_pca:
+        lr_feats = pca.project(lr_feats)
     return lr_feats, pca
 
 
@@ -296,8 +299,6 @@ class TorchPCA(object):
 
 
 def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=None):
-    device = image_feats_list[0].device
-
     def flatten(tensor, target_size=None):
         if target_size is not None and fit_pca is None:
             tensor = F.interpolate(tensor, (target_size, target_size), mode="bilinear")
