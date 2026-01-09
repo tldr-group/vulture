@@ -192,6 +192,7 @@ class CompleteUpsampler(nn.Module):
         existing_pca: PCAUnprojector | None = None,
         n_imgs_pca: int = 50,
         n_batch: int = 50,
+        modify_feature_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Get low-res features from base feature model for image. This does one of the following (based on $self.feature_type):
 
@@ -216,6 +217,8 @@ class CompleteUpsampler(nn.Module):
             n_imgs_pca (int, optional): number of transforms to use in FEATUP shared PCA. Defaults to 50.
             n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
                 into memory issues for large images. Defaults to 50.
+            modify_feature_function (Callable[[torch.Tensor], torch.Tensor] | None, optional): optional function to modify the DINOv2
+                checkpoints features (i.e the dim=384 vectors). Assumes the tensor is (B, C, H, W) and returns same shape.
 
         Raises:
             Exception: if invalid feature type supplied
@@ -229,6 +232,11 @@ class CompleteUpsampler(nn.Module):
             assert isinstance(image, torch.Tensor), "Image must be tensor if transform_input is false"
             lr_feat_input_img = image
 
+        def optionally_apply_modify_fn(feats: torch.Tensor) -> torch.Tensor:
+            if modify_feature_function is not None:
+                feats = modify_feature_function(feats)
+            return feats
+
         match self.feature_type:
             case "FEATUP":
                 k = self.upsampler.n_ch_in
@@ -239,21 +247,25 @@ class CompleteUpsampler(nn.Module):
                     existing_pca=existing_pca,
                     n_imgs=n_imgs_pca,
                     n_batch=n_batch,
+                    modify_feature_function=modify_feature_function,
                 )
             case "LOFTUP_FULL":
                 assert self.denoiser is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                dv2_feats = optionally_apply_modify_fn(dv2_feats)
                 lr_feats = self.denoiser.forward_(dv2_feats)
             case "LOFTUP_COMPRESSED":
                 assert self.denoiser is not None
                 assert self.autoencoder is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
                 denoised_feats = self.denoiser.forward_(dv2_feats)
+                denoised_feats = optionally_apply_modify_fn(denoised_feats)
                 denoised_feats = F.normalize(denoised_feats, p=1, dim=1)
                 lr_feats = self.autoencoder.encoder(denoised_feats)
             case "ALIBI_COMPRESSED":
                 assert self.autoencoder is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                dv2_feats = optionally_apply_modify_fn(dv2_feats)
                 dv2_feats = F.normalize(dv2_feats, p=1, dim=1)
                 lr_feats = self.autoencoder.encoder(dv2_feats)
             case _:
@@ -289,6 +301,7 @@ class CompleteUpsampler(nn.Module):
         existing_pca: PCAUnprojector | None = None,
         n_imgs_pca: int = 50,
         n_batch: int = 50,
+        modify_feature_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Get upsampled features for input image $upsampler_img, computing low-res features first.
 
@@ -299,13 +312,21 @@ class CompleteUpsampler(nn.Module):
             n_imgs_pca (int, optional): number of transforms to use in FEATUP shared PCA. Defaults to 50.
             n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
                 into memory issues for large images. Defaults to 50.
+            modify_feature_function (Callable[[torch.Tensor], torch.Tensor] | None, optional): optional function to modify the DINOv2
+                checkpoints features (i.e the dim=384 vectors). Assumes the tensor is (B, C, H, W) and returns same shape.
 
         Returns:
             torch.Tensor: (1, n, H, W) high-res features
         """
         lr_feat_input_img, upsampler_input_img = self.transform_image(image)
         lr_feats = self.get_lr_feats(
-            lr_feat_input_img, True, False, existing_pca=existing_pca, n_imgs_pca=n_imgs_pca, n_batch=n_batch
+            lr_feat_input_img,
+            True,
+            False,
+            existing_pca=existing_pca,
+            n_imgs_pca=n_imgs_pca,
+            n_batch=n_batch,
+            modify_feature_function=modify_feature_function,
         )
         dtype = torch.float16 if self.to_half else torch.float32
         return self.get_hr_feats(upsampler_input_img, lr_feats, dtype)
