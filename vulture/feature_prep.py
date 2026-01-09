@@ -52,14 +52,15 @@ the propagator to quickly extract the LR-features so they can be input into the 
 class PCAUnprojector(nn.Module):
     def __init__(self, feats, dim, device, use_torch_pca=False, **kwargs):
         super().__init__()
-        self.dim = dim
+        self.register_buffer("dim", torch.tensor(dim))
 
         if feats is not None:
-            self.original_dim = feats.shape[1]
+            original_dim = feats.shape[1]
         else:
-            self.original_dim = kwargs["original_dim"]
+            original_dim = kwargs["original_dim"]
+        self.register_buffer("original_dim", torch.tensor(original_dim))
 
-        if self.dim != self.original_dim:
+        if dim != original_dim:
             if feats is not None:
                 sklearn_pca = pca([feats], dim=dim, use_torch_pca=use_torch_pca)[1]
 
