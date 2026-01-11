@@ -188,3 +188,4 @@ old
 examples/denoising_data/*
 denoising_batch.ipynb
 scripts/*
+examples/denoising

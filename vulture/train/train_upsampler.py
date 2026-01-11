@@ -47,6 +47,30 @@ net = FeatureUpsampler(
 init_weights(net, expr.weights_init)
 
 
+class Cosine_MSE(nn.Module):
+    # from JAFAR
+    def __init__(self, reduction):
+        super().__init__()
+        self.mse_loss = torch.nn.MSELoss(reduction=reduction)
+        self.cosine_loss = torch.nn.CosineEmbeddingLoss(reduction=reduction)
+
+    def forward(self, pred, target):
+        b, c, h, w = pred.shape
+
+        pred = pred.permute(0, 2, 3, 1).reshape(-1, c)
+        target = target.permute(0, 2, 3, 1).reshape(-1, c)
+
+        gt = torch.ones_like(target[:, 0])
+
+        # If you must normalize (example: min-max scaling)
+        min_val = torch.min(target, dim=1, keepdim=True).values
+        max_val = torch.max(target, dim=1, keepdim=True).values
+        pred_normalized = (pred - min_val) / (max_val - min_val + 1e-6)
+        target_normalized = (target - min_val) / (max_val - min_val + 1e-6)
+
+        return self.cosine_loss(pred, target, gt) + self.mse_loss(pred_normalized, target_normalized)
+
+
 opt_dict = {
     "adamw": torch.optim.AdamW,
     "adam": torch.optim.Adam,
@@ -56,7 +80,7 @@ opt: torch.optim.Optimizer = opt_dict[expr.optim](net.parameters(), lr=expr.lr, 
 N_EPOCHS = expr.n_epochs
 SAVE_PER = expr.save_per
 
-loss_dict: dict = {"smooth_l1": nn.SmoothL1Loss, "l1": nn.L1Loss, "l2": nn.MSELoss}
+loss_dict: dict = {"smooth_l1": nn.SmoothL1Loss, "l1": nn.L1Loss, "l2": nn.MSELoss, "cosine_mse": Cosine_MSE}
 loss_fn: nn.modules.loss._Loss = loss_dict[expr.loss](reduction="sum")
 
 # scheduler = ReduceLROnPlateau(opt, patience=20)
@@ -138,11 +162,12 @@ for i in range(N_EPOCHS):
     val_losses.append(val_loss)
 
     # scheduler.step(val_loss)
-    if i % SAVE_PER == 0:
+    to_save = i % SAVE_PER == 0
+    if to_save:
         vis(net, val_dl)
 
-    if val_loss < best_val_loss:
+    if val_loss < best_val_loss and to_save:
         obj = {"weights": net.state_dict(), "config": config_from_expriment(expr)}
         # todo: just save every 100 epochs?
-        torch.save(net.state_dict(), f"{OUT_PATH}/best.pth")
+        torch.save(obj, f"{OUT_PATH}/best.pth")
         best_val_loss = val_loss

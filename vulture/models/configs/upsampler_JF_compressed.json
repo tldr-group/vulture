@@ -4,7 +4,7 @@
     "name": "upsampler_JF_ac24_alibi",
     "k": 3,
     "n_ch_in": 24,
-    "n_ch_hidden": 24,
+    "n_ch_hidden": 48,
     "n_ch_out": 24,
     "n_ch_guidance": 3,
     "n_ch_downsampler": 24,
@@ -30,10 +30,10 @@
     "load_size": 252
   },
   "training": {
-    "loss": "smooth_l1",
+    "loss": "cosine_mse",
     "optim": "adamw",
     "lr": 1e-4,
-    "clip_norm_threshold": 1.0,
+    "clip_norm_threshold": 0.0,
     "weight_decay": 0.0,
     "batch_size": 32,
     "n_epochs": 5000,
