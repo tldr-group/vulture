@@ -8,6 +8,7 @@ import random
 from sklearn.decomposition import PCA
 
 from random import choice
+from typing import Callable
 
 from vulture.models import PretrainedViTWrapper
 
@@ -51,14 +52,15 @@ the propagator to quickly extract the LR-features so they can be input into the 
 class PCAUnprojector(nn.Module):
     def __init__(self, feats, dim, device, use_torch_pca=False, **kwargs):
         super().__init__()
-        self.dim = dim
+        self.register_buffer("dim", torch.tensor(dim))
 
         if feats is not None:
-            self.original_dim = feats.shape[1]
+            original_dim = feats.shape[1]
         else:
-            self.original_dim = kwargs["original_dim"]
+            original_dim = kwargs["original_dim"]
+        self.register_buffer("original_dim", torch.tensor(original_dim))
 
-        if self.dim != self.original_dim:
+        if dim != original_dim:
             if feats is not None:
                 sklearn_pca = pca([feats], dim=dim, use_torch_pca=use_torch_pca)[1]
 
@@ -220,6 +222,7 @@ def get_lr_featup_feats_and_pca(
     n_batch: int = 50,
     existing_pca: PCAUnprojector | None = None,
     apply_pca: bool = True,
+    modify_feature_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
 ) -> tuple[torch.Tensor, PCAUnprojector]:
     """Get low-res base feature model (DINOv2) features projected onto down to $n_feats_in dimensions
     across a shared PCA of features of transformations of the image. This is so our low-res features
@@ -244,10 +247,18 @@ def get_lr_featup_feats_and_pca(
             into memory issues for large images. Defaults to 50.
         existing_pca (PCAUnprojector | None, optional): if supplied, compute base model features for image,
             project using this pca and return (i.e don't compute shared PCA). Defaults to None.
+        modify_feature_function (Callable[[torch.Tensor], torch.Tensor] | None, optional): optional function to modify the DINOv2
+                checkpoints features (i.e the dim=384 vectors). Assumes the tensor is (B, C, H, W) and returns same shape.
 
     Returns:
         tuple[torch.Tensor, PCAUnprojector]: (1, $n_feats_in, N_th, N_tw) low-res features & computed PCA
     """
+
+    def optionally_apply_modify_fn(feats: torch.Tensor) -> torch.Tensor:
+        if modify_feature_function is not None:
+            feats = modify_feature_function(feats)
+        return feats
+
     cfg_n_images = min(n_imgs * len(imgs), 50)  # 3000  # 3000
     cfg_use_flips = True
     cfg_max_zoom = 1.8
@@ -259,12 +270,15 @@ def get_lr_featup_feats_and_pca(
     loader = DataLoader(dataset, cfg_pca_batch)
     lr_feats = model.forward_features(imgs[0], make_2D=True)
 
+    lr_feats = optionally_apply_modify_fn(lr_feats)
+
     if existing_pca and apply_pca:
         return existing_pca.project(lr_feats), existing_pca
 
     jit_features: list[torch.Tensor] = []
     for transformed_image, _ in loader:
         transformed_feats = model.forward_features(transformed_image, make_2D=True)
+        transformed_feats = optionally_apply_modify_fn(transformed_feats)
         jit_features.append(transformed_feats)
     stacked_jit_features = torch.cat(jit_features, dim=0)
 
