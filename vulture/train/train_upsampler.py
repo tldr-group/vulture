@@ -19,16 +19,16 @@ DEVICE = "cuda:1"
 
 OUT_PATH = "experiments/current"
 
-expr_path = "vulture/models/configs/upsampler_LU_compressed.json"
+expr_path = "vulture/models/configs/upsampler_JF_compressed.json"
 expr = expriment_from_json(expr_path)
 copy(expr_path, f"{OUT_PATH}/config.json")
 print(expr)
 
 train_ds = EmbeddingDataset(
-    "data/imagenet_reduced", "train", expr=expr, device=DEVICE, data_suffix="_lu_reg", using_splits=False
+    "data/imagenet_reduced", "train", expr=expr, device=DEVICE, data_suffix="_jf_reg", using_splits=False
 )
 val_ds = EmbeddingDataset(
-    "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_lu_reg", using_splits=False
+    "data/imagenet_reduced", "val", expr=expr, device=DEVICE, data_suffix="_jf_reg", using_splits=False
 )
 
 train_dl = DataLoader(train_ds, expr.batch_size, True, drop_last=True)

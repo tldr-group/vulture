@@ -37,7 +37,7 @@ paper = [
   "segmentation_models_pytorch",
   "albumentations",
   # "featup@git+https://github.com/mhamilton723/FeatUp",
-  "pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models",
+  #"pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models",
   "PyWavelets",
   "ipykernel",
   "interactive-seg-backend@git+https://github.com/tldr-group/interactive-seg-backend"
@@ -51,15 +51,15 @@ featup = ["torch"]
 "Bug Tracker" = "https://github.com/tldr-group/vulture/issues"
 
 [tool.setuptools]
-packages = ["vulture", "vulture.models", "vulture.models.external"]
+packages = ["vulture", "vulture.models", "vulture.models.external", "vulture.comparisons"]
 
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-]
-torchvision = [
-  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-]
+#[tool.uv.sources]
+#torch = [
+#  { index = "pytorch-cu128" },
+#]
+#torchvision = [
+#  { index = "pytorch-cu128" },
+#]
 # featup = [{ index = "pypi", ignore-deps = true },]
 
 [[tool.uv.index]]

@@ -4,8 +4,8 @@ from shutil import move
 
 seed(1025)
 N_VAL = 500
-input_dir = "data/imagenet_reduced/data_lu_reg"
-target_dir = "data/imagenet_reduced/val_lu_reg"
+input_dir = "data/imagenet_reduced/data_jf_reg"
+target_dir = "data/imagenet_reduced/val_jf_reg"
 if __name__ == "__main__":
     all_data = listdir(input_dir)
     # sample without replacement

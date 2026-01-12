@@ -13,6 +13,12 @@ from timm import create_model
 from timm.data import create_transform, resolve_data_config
 from timm.models.vision_transformer import VisionTransformer, Attention, Block
 
+import re
+from typing import cast
+from types import MethodType
+from typing import Callable, Literal
+
+
 FLASH_ATTN_INSTALLED = False
 try:
     from flash_attn import flash_attn_qkvpacked_func
@@ -22,13 +28,7 @@ except ImportError:
     pass
 
 
-import re
-from typing import cast
-from types import MethodType
-from typing import Callable, Literal
-
-
-FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED"]
+FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED", "ALIBI_COMPRESSED"]
 FIT3D_DINOv2_REG_SMALL_URL = "https://huggingface.co/yuanwenyue/FiT3D/resolve/main/dinov2_reg_small_finetuned.pth"
 
 MODEL_LIST = [
@@ -43,6 +43,7 @@ MODEL_MAP: dict[FeatureType, str] = {
     "FEATUP": MODEL_LIST[2],
     "LOFTUP_FULL": MODEL_LIST[1],
     "LOFTUP_COMPRESSED": MODEL_LIST[1],
+    "ALIBI_COMPRESSED": MODEL_LIST[1],
 }
 
 
@@ -56,11 +57,8 @@ class Patch:
         :rtype: Callable
         """
 
-        def forward(
-            self: Attention,
-            x: torch.Tensor,
-            attn_bias=None,
-        ) -> torch.Tensor:
+        # we add both attn_bias and attn_mask to align with old & new timm interfaces
+        def forward(self: Attention, x: torch.Tensor, attn_bias=None, attn_mask=None) -> torch.Tensor:
             # TODO: attn_bias -> attn_mask in new timm, find way to align these
             B, N, C = x.shape
             qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)

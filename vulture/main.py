@@ -1,4 +1,4 @@
-from typing import Any, Mapping
+from typing import Any, Mapping, Callable
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,6 +7,7 @@ from PIL import Image
 
 import numpy as np
 
+from vulture.models.external.alibi_vit_wrapper import AlibiVitWrapper
 from vulture.models.external.vit_wrapper import add_flash_attention
 from vulture.models import (
     PretrainedViTWrapper,
@@ -33,8 +34,10 @@ from vulture.utils import (
     Experiment,
 )
 
+TransformFn = Callable[[np.ndarray | Image.Image | torch.Tensor, str, bool, int], tuple[torch.Tensor, torch.Tensor]]
 
-def transform_image(
+
+def default_image_transform(
     image: np.ndarray | Image.Image | torch.Tensor, device: str, to_half: bool = False, patch_size: int = 14
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Take input image and transform for both original feature model (closest crop to multiple of patch length, norm)
@@ -89,11 +92,13 @@ class CompleteUpsampler(nn.Module):
         chk_or_cfg: str | UpsamplerConfig,
         denoiser_chk: str | None = None,
         autoencoder_chk_or_cfg: str | AutoencoderConfig | None = None,
+        dino_chk: str | None = None,
         device: str = "cpu",
-        add_flash_attn: bool = True,
+        add_flash_attn: bool = False,
         to_eval: bool = False,
         to_half: bool = False,
         stride: int = 14,
+        transform_fn: TransformFn = default_image_transform,
     ) -> None:
         """Feature upsampler wrapper class.
 
@@ -118,16 +123,29 @@ class CompleteUpsampler(nn.Module):
         super().__init__()
         self.feature_type: FeatureType = feature_type
         # Load base DINOv2 model
-        self.dv2_model = PretrainedViTWrapper(
-            MODEL_MAP[feature_type], stride=stride, add_flash_attn=add_flash_attn, device=device
-        )
+        self.dv2_model: PretrainedViTWrapper
+        if feature_type == "ALIBI_COMPRESSED":
+            assert dino_chk is not None, "Must supply Alibi finetuned DINOv2 checkpoint"
+            self.dv2_model = AlibiVitWrapper(
+                MODEL_MAP[feature_type], stride=stride, add_flash_attn=add_flash_attn, device=device
+            )
+        else:
+            self.dv2_model = PretrainedViTWrapper(
+                MODEL_MAP[feature_type], stride=stride, add_flash_attn=add_flash_attn, device=device
+            )
+        # Apply weights
+        if dino_chk is not None:
+            weights = torch.load(dino_chk, map_location=device, weights_only=True)
+            self.dv2_model.load_state_dict(weights)
+
         self.denoiser: Denoiser | None = None
         self.autoencoder: Autoencoder | None = None
 
+        needs_denoiser = ("LOFTUP_FULL", "LOFTUP_COMPRESSED")
         # Load or initialise optional models
-        if denoiser_chk is None and feature_type != "FEATUP":
+        if denoiser_chk is None and feature_type in needs_denoiser:
             self.denoiser = get_denoiser(None, device, to_eval, to_half)
-        elif denoiser_chk is not None and feature_type != "FEATUP":
+        elif denoiser_chk is not None and feature_type in needs_denoiser:
             self.denoiser = get_denoiser(denoiser_chk, device, to_eval, to_half)
 
         if isinstance(autoencoder_chk_or_cfg, str):
@@ -146,8 +164,17 @@ class CompleteUpsampler(nn.Module):
         if self.to_eval:
             self = self.eval()
         self.to_half = to_half
+        if self.to_half:
+            self = self.half()
 
-    def transform_image(self, image: np.ndarray | Image.Image | torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.to_half is False and add_flash_attn is True:
+            raise Exception("Flash attention requires half precision. Set to_half=True.")
+
+        self.transform_fn = transform_fn
+
+    def transform_image(
+        self, image: np.ndarray | Image.Image | torch.Tensor, **kwargs
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Take input image and transform for both original feature model (closest crop to multiple of patch length, norm)
         and for upsampler image (norm).
 
@@ -160,7 +187,7 @@ class CompleteUpsampler(nn.Module):
             tuple[torch.Tensor, torch.Tensor]: transformed image for feature model, transformed image for upsampler.
                 These are (1,C,H,W).
         """
-        return transform_image(image, self.device, self.to_half, self.dv2_model.patch_size)
+        return self.transform_fn(image, self.device, self.to_half, self.dv2_model.patch_size, **kwargs)
 
     def get_lr_feats(
         self,
@@ -170,6 +197,7 @@ class CompleteUpsampler(nn.Module):
         existing_pca: PCAUnprojector | None = None,
         n_imgs_pca: int = 50,
         n_batch: int = 50,
+        modify_feature_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Get low-res features from base feature model for image. This does one of the following (based on $self.feature_type):
 
@@ -194,6 +222,8 @@ class CompleteUpsampler(nn.Module):
             n_imgs_pca (int, optional): number of transforms to use in FEATUP shared PCA. Defaults to 50.
             n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
                 into memory issues for large images. Defaults to 50.
+            modify_feature_function (Callable[[torch.Tensor], torch.Tensor] | None, optional): optional function to modify the DINOv2
+                checkpoints features (i.e the dim=384 vectors). Assumes the tensor is (B, C, H, W) and returns same shape.
 
         Raises:
             Exception: if invalid feature type supplied
@@ -207,6 +237,11 @@ class CompleteUpsampler(nn.Module):
             assert isinstance(image, torch.Tensor), "Image must be tensor if transform_input is false"
             lr_feat_input_img = image
 
+        def optionally_apply_modify_fn(feats: torch.Tensor) -> torch.Tensor:
+            if modify_feature_function is not None:
+                feats = modify_feature_function(feats)
+            return feats
+
         match self.feature_type:
             case "FEATUP":
                 k = self.upsampler.n_ch_in
@@ -217,18 +252,27 @@ class CompleteUpsampler(nn.Module):
                     existing_pca=existing_pca,
                     n_imgs=n_imgs_pca,
                     n_batch=n_batch,
+                    modify_feature_function=modify_feature_function,
                 )
             case "LOFTUP_FULL":
                 assert self.denoiser is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                dv2_feats = optionally_apply_modify_fn(dv2_feats)
                 lr_feats = self.denoiser.forward_(dv2_feats)
             case "LOFTUP_COMPRESSED":
                 assert self.denoiser is not None
                 assert self.autoencoder is not None
                 dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
                 denoised_feats = self.denoiser.forward_(dv2_feats)
+                denoised_feats = optionally_apply_modify_fn(denoised_feats)
                 denoised_feats = F.normalize(denoised_feats, p=1, dim=1)
                 lr_feats = self.autoencoder.encoder(denoised_feats)
+            case "ALIBI_COMPRESSED":
+                assert self.autoencoder is not None
+                dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                dv2_feats = optionally_apply_modify_fn(dv2_feats)
+                dv2_feats = F.normalize(dv2_feats, p=1, dim=1)
+                lr_feats = self.autoencoder.encoder(dv2_feats)
             case _:
                 raise Exception(f"Unsupported feature type {_}")
 
@@ -262,6 +306,7 @@ class CompleteUpsampler(nn.Module):
         existing_pca: PCAUnprojector | None = None,
         n_imgs_pca: int = 50,
         n_batch: int = 50,
+        modify_feature_function: Callable[[torch.Tensor], torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Get upsampled features for input image $upsampler_img, computing low-res features first.
 
@@ -272,15 +317,23 @@ class CompleteUpsampler(nn.Module):
             n_imgs_pca (int, optional): number of transforms to use in FEATUP shared PCA. Defaults to 50.
             n_batch (int, optional): batch size of transformed feature computation in FEATUP shared PCA. Turn this down if running
                 into memory issues for large images. Defaults to 50.
+            modify_feature_function (Callable[[torch.Tensor], torch.Tensor] | None, optional): optional function to modify the DINOv2
+                checkpoints features (i.e the dim=384 vectors). Assumes the tensor is (B, C, H, W) and returns same shape.
 
         Returns:
             torch.Tensor: (1, n, H, W) high-res features
         """
         lr_feat_input_img, upsampler_input_img = self.transform_image(image)
         lr_feats = self.get_lr_feats(
-            lr_feat_input_img, True, False, existing_pca=existing_pca, n_imgs_pca=n_imgs_pca, n_batch=n_batch
+            lr_feat_input_img,
+            True,
+            False,
+            existing_pca=existing_pca,
+            n_imgs_pca=n_imgs_pca,
+            n_batch=n_batch,
+            modify_feature_function=modify_feature_function,
         )
-        dtype = torch.float16 if self.device else torch.float32
+        dtype = torch.float16 if self.to_half else torch.float32
         return self.get_hr_feats(upsampler_input_img, lr_feats, dtype)
 
 
