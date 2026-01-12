@@ -93,6 +93,7 @@ class CompleteUpsampler(nn.Module):
         add_flash_attn: bool = True,
         to_eval: bool = False,
         to_half: bool = False,
+        stride: int = 14,
     ) -> None:
         """Feature upsampler wrapper class.
 
@@ -117,7 +118,9 @@ class CompleteUpsampler(nn.Module):
         super().__init__()
         self.feature_type: FeatureType = feature_type
         # Load base DINOv2 model
-        self.dv2_model = PretrainedViTWrapper(MODEL_MAP[feature_type], add_flash_attn=add_flash_attn, device=device)
+        self.dv2_model = PretrainedViTWrapper(
+            MODEL_MAP[feature_type], stride=stride, add_flash_attn=add_flash_attn, device=device
+        )
         self.denoiser: Denoiser | None = None
         self.autoencoder: Autoencoder | None = None
 
