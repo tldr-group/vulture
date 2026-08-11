@@ -1,8 +1,8 @@
-import torch
-import torch.nn as nn
-
-from typing import Literal
 from dataclasses import dataclass
+from typing import Literal
+
+import torch
+from torch import nn
 
 Optims = Literal["Adam", "AdamW", "SGD"]
 Losses = Literal["MSE", "MAE"]

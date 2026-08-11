@@ -1,27 +1,21 @@
-import torch
-import torch.nn as nn
-from torchvision import transforms
-import torch.autograd.profiler as profiler
-
-import numpy as np
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
-from time import time_ns
-from PIL import Image
-import matplotlib.pyplot as plt
-
-from json import load as load_json
-
-from typing import Literal
-from dataclasses import dataclass, field
-
 import warnings
+from dataclasses import dataclass, field
+from json import load as load_json
+from time import time_ns
+from typing import Literal
 
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from PIL import Image
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from torch import nn
+from torchvision import transforms
 
 warnings.filterwarnings("ignore")
 
-NormType = Literal["minmax", "std", None]
+NormType = Literal["minmax", "std"] | None
 norm_dict = {
     "minmax": MinMaxScaler(feature_range=(0, 1), clip=True, copy=False),
     "std": StandardScaler(copy=False),
@@ -48,8 +42,8 @@ class Experiment:
     flip_h_prob: float = 0.5
     flip_v_prob: float = 0.5
     angles_deg: list[int] = field(default_factory=lambda: [0, 0, 0, 0, 90, 180, 270])
-    shift_dirs: list[tuple[int, int]] = field(default_factory=lambda: [])
-    shift_dists: list[int] = field(default_factory=lambda: [])
+    shift_dirs: list[tuple[int, int]] = field(default_factory=list)
+    shift_dists: list[int] = field(default_factory=list)
     norm: bool = True
     load_size: int = 224
 
@@ -154,7 +148,7 @@ def do_pca(
 
     pca = PCA(n_components=n_components)
 
-    train_proj = pca.fit_transform(train_data)
+    pca.fit_transform(train_data)
     projection = pca.transform(arr)
 
     if post_norm != None:
@@ -171,7 +165,7 @@ def do_2D_pca(
     pre_norm: NormType = None,
     post_norm: NormType = None,
 ) -> np.ndarray:
-    c, h, w = arr_2D.shape
+    _c, h, w = arr_2D.shape
     flat = flatten(arr_2D)
     proj = do_pca(flat, n_components, n_samples, pre_norm, post_norm)
     proj_2d = proj.reshape((h, w, n_components))
@@ -313,7 +307,7 @@ def get_arrs_from_batch(
     pred_hr_feats: torch.Tensor | None,
     featup_feats: bool = False,
 ) -> list[list[np.ndarray]]:
-    b, c, h, w = hr_feats.shape
+    b, _c, h, w = hr_feats.shape
 
     arrs: list[list[np.ndarray]] = []
     for i in range(b):

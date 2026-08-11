@@ -1,14 +1,18 @@
-import torch
-import torch.nn as nn
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-
-import numpy as np
 from shutil import copy
 
-from vulture.datasets import EmbeddingDataset, DataLoader, unnorm
+import numpy as np
+import torch
+from torch import nn
+
+from vulture.datasets import DataLoader, EmbeddingDataset, unnorm
 from vulture.models import FeatureUpsampler
 from vulture.models.model import init_weights
-from vulture.utils import config_from_expriment, visualise, plot_losses, expriment_from_json
+from vulture.utils import (
+    config_from_expriment,
+    expriment_from_json,
+    plot_losses,
+    visualise,
+)
 
 torch.manual_seed(0)
 np.random.seed(0)

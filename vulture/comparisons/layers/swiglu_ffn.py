@@ -4,20 +4,20 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import os
-from typing import Callable, Optional
 import warnings
+from collections.abc import Callable
 
-from torch import Tensor, nn
 import torch.nn.functional as F
+from torch import Tensor, nn
 
 
 class SwiGLUFFN(nn.Module):
     def __init__(
         self,
         in_features: int,
-        hidden_features: Optional[int] = None,
-        out_features: Optional[int] = None,
-        act_layer: Callable[..., nn.Module] = None,
+        hidden_features: int | None = None,
+        out_features: int | None = None,
+        act_layer: Callable[..., nn.Module] | None = None,
         drop: float = 0.0,
         bias: bool = True,
     ) -> None:
@@ -55,9 +55,9 @@ class SwiGLUFFNFused(SwiGLU):
     def __init__(
         self,
         in_features: int,
-        hidden_features: Optional[int] = None,
-        out_features: Optional[int] = None,
-        act_layer: Callable[..., nn.Module] = None,
+        hidden_features: int | None = None,
+        out_features: int | None = None,
+        act_layer: Callable[..., nn.Module] | None = None,
         drop: float = 0.0,
         bias: bool = True,
     ) -> None:

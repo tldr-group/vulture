@@ -1,10 +1,13 @@
 # Taken from JAFAR: https://github.com/PaulCouairon/JAFAR
-import torch
 import torch.nn.functional as F
 from einops import rearrange
 from torch import nn
 
-from vulture.comparisons.jafar.layers import CrossAttentionBlock, ResBlock, SFTModulation
+from vulture.comparisons.jafar.layers import (
+    CrossAttentionBlock,
+    ResBlock,
+    SFTModulation,
+)
 from vulture.comparisons.jafar.layers.positional_encoding import RoPE, create_coordinate
 
 

@@ -1,16 +1,15 @@
-import torch
-from torch.utils.data import Dataset, DataLoader
-import torch.nn.functional as F
-from torchvision.transforms import functional as TF  # type: ignore
+import warnings
 from os import listdir
-from PIL import Image
 from typing import Literal
 
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from torchvision.transforms import functional as TF  # type: ignore
+
 # from vulture.datasets.learn_remap_LU_feats import apply
-from vulture.utils import visualise, Experiment
-
-
-import warnings
+from vulture.utils import Experiment, visualise
 
 warnings.filterwarnings("ignore")
 

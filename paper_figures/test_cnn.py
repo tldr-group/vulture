@@ -1,11 +1,10 @@
-import torch
 import random
-
 from os import getcwd
-import numpy as np
-import matplotlib.pyplot as plt
-import pretrained_microscopy_models as pmm
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pretrained_microscopy_models as pmm
+import torch
 import yoeo.comparisons.pmm_helpers as pmm_h
 
 random.seed(0)

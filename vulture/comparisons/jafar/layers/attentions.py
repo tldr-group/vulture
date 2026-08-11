@@ -1,8 +1,5 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from einops import rearrange
-from torch import einsum
+from torch import einsum, nn
 
 
 class CrossAttention(nn.Module):

@@ -1,5 +1,5 @@
-from random import shuffle, seed
 from os import listdir
+from random import seed, shuffle
 from shutil import move
 
 seed(1025)

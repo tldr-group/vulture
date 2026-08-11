@@ -1,15 +1,15 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.utils.benchmark as benchmark
-import numpy as np
-from math import log2, floor, ceil
-
-from vulture.models.layers import DoubleConv, Up, Down
-from vulture.utils import measure_mem_time, get_n_params
-
-from typing import Literal
 from dataclasses import dataclass
+from math import ceil, floor, log2
+from typing import Literal
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torch.utils import benchmark
+
+from vulture.models.layers import DoubleConv, Down, Up
+from vulture.utils import get_n_params, measure_mem_time
 
 PaddingModes = Literal["zeros", "reflect", "replicate", "circular"]
 InitTypes = Literal["ones", "zeros", "xavier", "uniform", "default"]

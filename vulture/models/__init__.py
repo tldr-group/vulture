@@ -1,19 +1,25 @@
 __all__ = [
-    "PretrainedViTWrapper",
     "MODEL_MAP",
-    "FeatureType",
     "Autoencoder",
-    "get_autoencoder",
-    "Denoiser",
-    "get_denoiser",
-    "LearnedDownsampler",
-    "Upsampler",
-    "FeatureUpsampler",
-    "get_upsampler",
     "AutoencoderConfig",
+    "Denoiser",
+    "FeatureType",
+    "FeatureUpsampler",
+    "LearnedDownsampler",
+    "PretrainedViTWrapper",
+    "Upsampler",
     "UpsamplerConfig",
+    "get_autoencoder",
+    "get_denoiser",
+    "get_upsampler",
 ]
-from .external.vit_wrapper import PretrainedViTWrapper, MODEL_MAP, FeatureType
 from .external.autoencoder import Autoencoder, AutoencoderConfig, get_autoencoder
 from .external.online_denoiser import Denoiser, get_denoiser
-from .model import LearnedDownsampler, Upsampler, FeatureUpsampler, get_upsampler, UpsamplerConfig
+from .external.vit_wrapper import MODEL_MAP, FeatureType, PretrainedViTWrapper
+from .model import (
+    FeatureUpsampler,
+    LearnedDownsampler,
+    Upsampler,
+    UpsamplerConfig,
+    get_upsampler,
+)

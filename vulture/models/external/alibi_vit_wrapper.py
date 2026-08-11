@@ -1,11 +1,10 @@
+from typing import Literal
+
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-
 from timm.layers.mlp import Mlp
-from timm.models.vision_transformer import Block, Attention
-
-from typing import Type, Literal, Optional
+from timm.models.vision_transformer import Attention, Block
+from torch import nn
 
 from vulture.models.external.vit_wrapper import PretrainedViTWrapper
 
@@ -183,7 +182,7 @@ class AlibiAttention(Attention):
         proj_bias: bool = True,
         attn_drop: float = 0.0,
         proj_drop: float = 0.0,
-        norm_layer: Type[nn.Module] = nn.LayerNorm,
+        norm_layer: type[nn.Module] = nn.LayerNorm,
         slope_type: AlibiSlopeType = "constant",
     ) -> None:
         super().__init__(
@@ -256,11 +255,11 @@ class AlibiBlock(Block):
         proj_bias: bool = True,
         proj_drop: float = 0.0,
         attn_drop: float = 0.0,
-        init_values: Optional[float] = None,
+        init_values: float | None = None,
         drop_path: float = 0.0,
-        act_layer: Type[nn.Module] = nn.GELU,
-        norm_layer: Type[nn.Module] = nn.LayerNorm,
-        mlp_layer: Type[nn.Module] = Mlp,
+        act_layer: type[nn.Module] = nn.GELU,
+        norm_layer: type[nn.Module] = nn.LayerNorm,
+        mlp_layer: type[nn.Module] = Mlp,
     ) -> None:
         super().__init__(
             dim=dim,
@@ -347,7 +346,7 @@ class AlibiVitWrapper(PretrainedViTWrapper):
 
     def forward_features(self, x: torch.Tensor, make_2D: bool = False, add_reg: bool = False, **kwargs) -> torch.Tensor:
         assert self.model.pos_embed is not None
-        b, _, h, w = x.shape
+        _b, _, h, w = x.shape
         p = self.patch_size
         s = self.stride
         n_patch_h, n_patch_w = (h - p) // s + 1, (w - p) // s + 1

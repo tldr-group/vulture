@@ -1,38 +1,38 @@
-from cProfile import label
-import torch
-import numpy as np
-from PIL import Image
-
-from vulture.main import (
-    get_hr_feats,
-    get_lr_feats,
-    convert_image,
-    closest_crop,
-    Experiment,
-)
-from vulture.models import FeatureUpsampler
-from vulture.utils import to_numpy
-from vulture.feature_prep import PCAUnprojector
-
 from os import listdir, makedirs
 from shutil import rmtree
+from typing import Literal
 
+import numpy as np
+import torch
 from interactive_seg_backend import featurise_
-from interactive_seg_backend.configs import TrainingConfig
 from interactive_seg_backend.classifiers.base import Classifier
-from interactive_seg_backend.file_handling import load_labels, load_image, save_featurestack, load_featurestack
+from interactive_seg_backend.configs import TrainingConfig
 from interactive_seg_backend.core import (
-    train,
+    get_model,
     get_training_data,
     shuffle_sample_training_data,
-    get_model,
+    train,
+)
+from interactive_seg_backend.file_handling import (
+    load_featurestack,
+    load_image,
+    load_labels,
+    save_featurestack,
 )
 from interactive_seg_backend.main import apply
 from interactive_seg_backend.utils import class_avg_miou
+from PIL import Image
 
-
-from typing import Literal
-
+from vulture.feature_prep import PCAUnprojector
+from vulture.main import (
+    Experiment,
+    closest_crop,
+    convert_image,
+    get_hr_feats,
+    get_lr_feats,
+)
+from vulture.models import FeatureUpsampler
+from vulture.utils import to_numpy
 
 DEVICE = "cuda:1"
 K_TRUNCATE = 32
@@ -118,7 +118,7 @@ def get_and_cache_features_over_images(
 
 # TODO: param train and apply to take list of cache strs and skip featurise if supplied
 
-BaselineAdditions = Literal[None, "random", "uniform", "duplicate"]
+BaselineAdditions = Literal["random", "uniform", "duplicate"] | None
 
 
 def train_model_over_images(

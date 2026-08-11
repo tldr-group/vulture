@@ -1,37 +1,38 @@
-from typing import Any, Mapping, Callable
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision.transforms import functional as TF
-from PIL import Image
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import numpy as np
+import torch
+import torch.nn.functional as F
+from PIL import Image
+from torch import nn
+from torchvision.transforms import functional as TF
 
-from vulture.models.external.alibi_vit_wrapper import AlibiVitWrapper
-from vulture.models.external.vit_wrapper import add_flash_attention
-from vulture.models import (
-    PretrainedViTWrapper,
-    Denoiser,
-    Autoencoder,
-    FeatureUpsampler,
-    AutoencoderConfig,
-    UpsamplerConfig,
-    get_denoiser,
-    get_autoencoder,
-    get_upsampler,
-    MODEL_MAP,
-    FeatureType,
-)
 from vulture.feature_prep import (
-    get_lr_feats,
     PCAUnprojector,
+    get_lr_feats,
     get_lr_featup_feats_and_pca,
 )
+from vulture.models import (
+    MODEL_MAP,
+    Autoencoder,
+    AutoencoderConfig,
+    Denoiser,
+    FeatureType,
+    FeatureUpsampler,
+    PretrainedViTWrapper,
+    UpsamplerConfig,
+    get_autoencoder,
+    get_denoiser,
+    get_upsampler,
+)
+from vulture.models.external.alibi_vit_wrapper import AlibiVitWrapper
+from vulture.models.external.vit_wrapper import add_flash_attention
 from vulture.utils import (
-    expriment_from_json,
+    Experiment,
     closest_crop,
     convert_image,
-    Experiment,
+    expriment_from_json,
 )
 
 TransformFn = Callable[[np.ndarray | Image.Image | torch.Tensor, str, bool, int], tuple[torch.Tensor, torch.Tensor]]

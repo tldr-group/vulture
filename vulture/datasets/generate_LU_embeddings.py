@@ -1,18 +1,16 @@
+from time import time
+
 import numpy as np
-from vulture.models.external.autoencoder import get_autoencoder
-from vulture.comparisons.loftup.upsamplers import norm
-from vulture.comparisons.loftup.featurizers import get_featurizer
-
-from vulture.models.external.online_denoiser import Denoiser
-from vulture.datasets.learn_remap_LU_feats import train, apply, vis
-
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-
 from datasets import load_dataset
 
-from time import time
+from vulture.comparisons.loftup.featurizers import get_featurizer
+from vulture.comparisons.loftup.upsamplers import norm
+from vulture.datasets.learn_remap_LU_feats import apply, train, vis
+from vulture.models.external.autoencoder import get_autoencoder
+from vulture.models.external.online_denoiser import Denoiser
 
 REMAP = True
 DENOISE = True

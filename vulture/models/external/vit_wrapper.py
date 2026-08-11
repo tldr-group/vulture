@@ -5,19 +5,17 @@ and has a helper to get patch features out.
 Adpated from https://github.com/Jiawei-Yang/Denoising-ViT/blob/main/dvt/models/vit_wrapper.py
 """
 
+import re
+from collections.abc import Callable
+from types import MethodType
+from typing import Literal, cast
+
 import torch
+from timm import create_model
+from timm.data import create_transform, resolve_data_config
+from timm.models.vision_transformer import Attention, Block, VisionTransformer
 from torch import nn
 from torchvision import transforms
-from timm import create_model
-
-from timm.data import create_transform, resolve_data_config
-from timm.models.vision_transformer import VisionTransformer, Attention, Block
-
-import re
-from typing import cast
-from types import MethodType
-from typing import Callable, Literal
-
 
 FLASH_ATTN_INSTALLED = False
 try:

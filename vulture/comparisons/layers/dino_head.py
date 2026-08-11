@@ -4,7 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn.init import trunc_normal_
 from torch.nn.utils import weight_norm
 

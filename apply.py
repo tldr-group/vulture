@@ -1,5 +1,5 @@
-from torch import no_grad
 from PIL import Image
+from torch import no_grad
 
 from vulture import CompleteUpsampler
 from vulture.utils import vis

@@ -9,18 +9,18 @@
 
 #  This file and the `layers` directory are from DINOv2 src: https://github.com/facebookresearch/dinov2
 
-from functools import partial
-import math
 import logging
-from typing import Sequence, Tuple, Union, Callable
+import math
+from collections.abc import Callable, Sequence
+from functools import partial
 
 import torch
-import torch.nn as nn
 import torch.utils.checkpoint
+from torch import nn
 from torch.nn.init import trunc_normal_
 
-from vulture.comparisons.layers import Mlp, PatchEmbed, SwiGLUFFNFused, MemEffAttention, NestedTensorBlock as Block
-
+from vulture.comparisons.layers import MemEffAttention, Mlp, PatchEmbed, SwiGLUFFNFused
+from vulture.comparisons.layers import NestedTensorBlock as Block
 
 logger = logging.getLogger("dinov2")
 
@@ -29,7 +29,7 @@ def named_apply(fn: Callable, module: nn.Module, name="", depth_first=True, incl
     if not depth_first and include_root:
         fn(module=module, name=name)
     for child_name, child_module in module.named_children():
-        child_name = ".".join((name, child_name)) if name else child_name
+        child_name = f"{name}.{child_name}" if name else child_name
         named_apply(fn=fn, module=child_module, name=child_name, depth_first=depth_first, include_root=True)
     if depth_first and include_root:
         fn(module=module, name=name)
@@ -213,7 +213,7 @@ class DinoVisionTransformer(nn.Module):
         return torch.cat((class_pos_embed.unsqueeze(0), patch_pos_embed), dim=1).to(previous_dtype)
 
     def prepare_tokens_with_masks(self, x, masks=None):
-        B, nc, w, h = x.shape
+        _B, _nc, w, h = x.shape
         x = self.patch_embed(x)
         if masks is not None:
             x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
@@ -300,11 +300,11 @@ class DinoVisionTransformer(nn.Module):
     def get_intermediate_layers(
         self,
         x: torch.Tensor,
-        n: Union[int, Sequence] = 1,  # Layers or n last layers to take
+        n: int | Sequence = 1,  # Layers or n last layers to take
         reshape: bool = False,
         return_class_token: bool = False,
         norm=True,
-    ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]]]:
+    ) -> tuple[torch.Tensor | tuple[torch.Tensor]]:
         if self.chunked_blocks:
             outputs = self._get_intermediate_layers_chunked(x, n)
         else:

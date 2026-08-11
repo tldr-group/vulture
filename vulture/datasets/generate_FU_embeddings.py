@@ -1,13 +1,14 @@
+import argparse
+from os import listdir
+
+import hydra
 import torch
 import torchvision.transforms as T
-import argparse
-import hydra
-from omegaconf import OmegaConf
-from os import listdir
-from PIL import Image
 from featup.train_implicit_upsampler import my_app
+from omegaconf import OmegaConf
+from PIL import Image
 
-from vulture.utils import do_2D_pca, to_numpy, do_pca
+from vulture.utils import do_pca, to_numpy
 
 torch.manual_seed(1001)
 
@@ -45,12 +46,12 @@ def gen_original_dv2_embeds(model: torch.nn.Module, folder: str) -> None:
         img = Image.open(img_fname).convert("RGB")
 
         tensor: torch.Tensor = tr(img).unsqueeze(0).cuda(DEVICE)
-        b, _, h, w = tensor.shape
+        _b, _, h, w = tensor.shape
         nt_w: int = 1 + (w - 14) // 14
         nt_h: int = 1 + (h - 14) // 14
         feat_dict: dict = model.forward_features(tensor)
         feats = feat_dict["x_norm_patchtokens"]
-        _, nt, c = feats.shape
+        _, _nt, _c = feats.shape
         # feats = feats.permute((0, 2, 1))
 
         feats_np = to_numpy(feats.detach())[0]
@@ -80,6 +81,6 @@ if __name__ == "__main__":
     # so far have done 0 and 2
     # need to do 3, 4, 5, 6, 7, 8, 9
     # can run this on a loop, make sure data config correct
-    for i in range(0, 10):
+    for i in range(10):
         start_featup(i)
     # gen_original_dv2_embeds(dv2, "data")

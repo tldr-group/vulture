@@ -1,8 +1,4 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from einops import rearrange, repeat
-from torch import einsum
+from torch import nn
 
 
 # Convolutions
@@ -20,7 +16,7 @@ class ResBlock(nn.Module):
         activation_fn=nn.SiLU,
         use_conv_shortcut=False,
     ):
-        super(ResBlock, self).__init__()
+        super().__init__()
         self.use_conv_shortcut = use_conv_shortcut
         self.norm1 = norm_fn(num_groups, in_channels) if norm_fn is not None else nn.Identity()
         self.conv1 = nn.Conv2d(

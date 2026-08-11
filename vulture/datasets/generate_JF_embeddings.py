@@ -1,17 +1,15 @@
-import numpy as np
-from vulture.models.external.autoencoder import get_autoencoder
-from vulture.models.external.alibi_vit_wrapper import AlibiVitWrapper
-from vulture.comparisons.jafar.jafar import JAFAR
-from vulture.utils import resize_crop
-from vulture.datasets.learn_remap_LU_feats import vis
+from time import time
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-import torchvision.transforms as T
-
 from datasets import load_dataset
 
-from time import time
+from vulture.comparisons.jafar.jafar import JAFAR
+from vulture.datasets.learn_remap_LU_feats import vis
+from vulture.models.external.alibi_vit_wrapper import AlibiVitWrapper
+from vulture.models.external.autoencoder import get_autoencoder
+from vulture.utils import resize_crop
 
 REMAP = True
 DENOISE = True

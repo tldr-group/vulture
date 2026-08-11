@@ -1,21 +1,18 @@
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
-
-from os import listdir, path, makedirs
+import time
+from os import listdir, makedirs, path
 from shutil import copyfile
-import time as time
-import numpy as np
+from typing import Literal
 
-import segmentation_models_pytorch as smp
-from segmentation_models_pytorch import utils as smp_utils
-import pretrained_microscopy_models as pmm
 import albumentations as albu
-
-from interactive_seg_backend.utils import class_avg_miou, class_avg_mious
-
-from typing import Any, Literal
+import numpy as np
+import pretrained_microscopy_models as pmm
+import segmentation_models_pytorch as smp
+import torch
+import torch.nn.functional as F
+from interactive_seg_backend.utils import class_avg_mious
+from segmentation_models_pytorch import utils as smp_utils
+from torch import nn
+from torch.utils.data import DataLoader
 
 
 def get_model(
@@ -132,7 +129,7 @@ def get_dataset(
 
 class MaskedDiceBCELoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
-        super(MaskedDiceBCELoss, self).__init__()
+        super().__init__()
         self.weight = weight
         self.__name__ = "DiceBCELoss"
 
@@ -280,7 +277,7 @@ def train_segmentation_model_with_eval(
 
     optimizer = torch.optim.Adam(
         [
-            dict(params=model.parameters(), lr=lr),
+            {"params": model.parameters(), "lr": lr},
         ]
     )
 
@@ -305,7 +302,6 @@ def train_segmentation_model_with_eval(
 
     patience_step = 0
     max_score = 0
-    best_epoch = 0
     epoch = 0
     is_sparse = len(list(class_values.keys())) == 4
     tot_time = 0
@@ -316,9 +312,7 @@ def train_segmentation_model_with_eval(
     while True:
         t = time.time() - t0
         print(
-            "\nEpoch: {}, lr: {:0.8f}, time: {:0.2f} seconds, patience step: {}, best iou: {:0.4f}".format(
-                epoch, lr, t, patience_step, max_score
-            )
+            f"\nEpoch: {epoch}, lr: {lr:0.8f}, time: {t:0.2f} seconds, patience step: {patience_step}, best iou: {max_score:0.4f}"
         )
         torch.cuda.synchronize("cuda")  # s.t time is accurate
         t0 = time.time()
@@ -361,7 +355,7 @@ def train_segmentation_model_with_eval(
 
         # Use early stopping if there has not been improvment in a while
         if patience_step >= patience:
-            print("\n\nTraining done!  No improvement in {} epochs. Saving final model".format(patience))
+            print(f"\n\nTraining done!  No improvement in {patience} epochs. Saving final model")
             if save_name is not None:
                 copyfile(path.join(save_folder, "model_best.pth.tar"), path.join(save_folder, save_name))
             return results, state

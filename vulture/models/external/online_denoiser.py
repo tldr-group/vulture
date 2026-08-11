@@ -3,9 +3,9 @@
 from functools import partial
 
 import torch
-import torch.nn as nn
 from timm.layers import resample_abs_pos_embed
 from timm.models.vision_transformer import Block, Mlp
+from torch import nn
 
 from vulture.models.external.vit_wrapper import PretrainedViTWrapper
 

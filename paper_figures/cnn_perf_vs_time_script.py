@@ -1,9 +1,8 @@
-import torch
 import random
 
 import numpy as np
-import matplotlib.pyplot as plt
 import pretrained_microscopy_models as pmm
+import torch
 
 import vulture.comparisons.pmm_helpers as pmm_h
 

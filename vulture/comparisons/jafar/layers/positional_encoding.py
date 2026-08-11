@@ -1,6 +1,6 @@
 import torch
-import torch.nn as nn
 from einops import rearrange
+from torch import nn
 
 
 def rotate_half(x):

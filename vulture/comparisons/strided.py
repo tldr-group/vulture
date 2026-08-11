@@ -1,12 +1,13 @@
-import torch
-from torch import nn
-import torch.nn.functional as F
+from collections.abc import Callable
 from math import sqrt
+from types import MethodType
+from typing import Literal
+
+import torch
+import torch.nn.functional as F
+from torch import nn
 
 from vulture.comparisons.vision_transformer import DinoVisionTransformer
-
-from types import MethodType
-from typing import Callable, Literal
 
 
 class Patch:
@@ -112,7 +113,7 @@ class StridedDv2(nn.Module):
         feats = out["x_norm_patchtokens"]
         if make_spatial:
             stride_l = self.stride[0]
-            _, t, c = feats.shape
+            _, _t, c = feats.shape
             _, _, h, w = x.shape
             n_patch_w: int = 1 + (w - self.original_patch_size) // stride_l
             n_patch_h: int = 1 + (h - self.original_patch_size) // stride_l

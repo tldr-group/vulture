@@ -9,17 +9,19 @@ Code by: Saksham Suri and Matthew Walmer
 Sample Usage:
 python lift_extractor.py --image_path assets/sample.jpg --output_path sample.pth --model_type dino_vits16 --lift_path pretrained/lift_dino_vits16.pth
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import transforms
-import torch.nn.modules.utils as nn_utils
 import math
-import timm
+import sys
 import types
 from pathlib import Path
-from typing import Union, List, Tuple
+
+import timm
+import torch
+import torch.nn.functional as F
+import torch.nn.modules.utils as nn_utils
 from PIL import Image
+from torch import nn
+from torchvision import transforms
+
 
 class ViTExtractor:
     """ This class facilitates extraction of features, descriptors, and saliency maps from a ViT.
@@ -90,7 +92,7 @@ class ViTExtractor:
         return model
 
     @staticmethod
-    def _fix_pos_enc(patch_size: int, stride_hw: Tuple[int, int]):
+    def _fix_pos_enc(patch_size: int, stride_hw: tuple[int, int]):
         """
         Creates a method for position encoding interpolation.
         :param patch_size: patch size of the model.
@@ -138,8 +140,8 @@ class ViTExtractor:
             return model
 
         stride = nn_utils._pair(stride)
-        assert all([(patch_size // s_) * s_ == patch_size for s_ in
-                    stride]), f'stride {stride} should divide patch_size {patch_size}'
+        assert all((patch_size // s_) * s_ == patch_size for s_ in
+                    stride), f'stride {stride} should divide patch_size {patch_size}'
 
         # fix the stride
         model.patch_embed.proj.stride = stride
@@ -147,8 +149,8 @@ class ViTExtractor:
         model.interpolate_pos_encoding = types.MethodType(ViTExtractor._fix_pos_enc(patch_size, stride), model)
         return model
 
-    def preprocess(self, image_path: Union[str, Path],
-                   load_size: Union[int, Tuple[int, int]] = None) -> Tuple[torch.Tensor, Image.Image]:
+    def preprocess(self, image_path: str | Path,
+                   load_size: int | tuple[int, int] | None = None) -> tuple[torch.Tensor, Image.Image]:
         """
         Preprocesses an image before extraction.
         :param image_path: path to image to be extracted.
@@ -192,7 +194,7 @@ class ViTExtractor:
             self._feats.append(qkv[facet_idx]) #Bxhxtxd
         return _inner_hook
 
-    def _register_hooks(self, layers: List[int], facet: str) -> None:
+    def _register_hooks(self, layers: list[int], facet: str) -> None:
         """
         register hook to extract features.
         :param layers: layers from which to extract features.
@@ -217,7 +219,7 @@ class ViTExtractor:
             handle.remove()
         self.hook_handlers = []
 
-    def _extract_features(self, batch: torch.Tensor, layers: List[int] = 11, facet: str = 'key') -> List[torch.Tensor]:
+    def _extract_features(self, batch: torch.Tensor, layers: list[int] = 11, facet: str = 'key') -> list[torch.Tensor]:
         """
         extract features from the model
         :param batch: batch to extract features for. Has shape BxCxHxW.
@@ -228,7 +230,7 @@ class ViTExtractor:
                   if facet is 'attn' has shape Bxhxtxt
                   if facet is 'token' has shape Bxtxd
         """
-        B, C, H, W = batch.shape
+        _B, _C, H, W = batch.shape
         self._feats = []
         self._register_hooks(layers, facet)
         _ = self.model(batch)
@@ -254,7 +256,7 @@ class ViTExtractor:
 
         avg_pools = []
         # compute bins of all sizes for all spatial locations.
-        for k in range(0, hierarchy):
+        for k in range(hierarchy):
             # avg pooling with kernel 3**kx3**k
             win_size = 3 ** k
             avg_pool = torch.nn.AvgPool2d(win_size, stride=1, padding=win_size // 2, count_include_pad=False)
@@ -265,7 +267,7 @@ class ViTExtractor:
             for x in range(self.num_patches[1]):
                 part_idx = 0
                 # fill all bins for a spatial location (y, x)
-                for k in range(0, hierarchy):
+                for k in range(hierarchy):
                     kernel_size = 3 ** k
                     for i in range(y - kernel_size, y + kernel_size + 1, kernel_size):
                         for j in range(x - kernel_size, x + kernel_size + 1, kernel_size):
@@ -318,7 +320,7 @@ class ViTExtractor:
         :param batch: batch to extract saliency maps for. Has shape BxCxHxW.
         :return: a tensor of saliency maps. has shape Bxt-1
         """
-        assert self.model_type == "dino_vits8", f"saliency maps are supported only for dino_vits model_type."
+        assert self.model_type == "dino_vits8", "saliency maps are supported only for dino_vits model_type."
         self._extract_features(batch, [11], 'attn')
         head_idxs = [0, 2, 4, 5]
         curr_feats = self._feats[0] #Bxhxtxt
@@ -377,7 +379,7 @@ post_shape: enable/disable reshaping of feature outputs
 """
 class LiFT(nn.Module):
     def __init__(self, in_channels, patch_size, pre_shape=True, post_shape=True):
-        super(LiFT, self).__init__()
+        super().__init__()
         self.patch_size = patch_size
         self.pre_shape = pre_shape
         self.post_shape = post_shape
@@ -398,7 +400,7 @@ class LiFT(nn.Module):
             self.scale_adapter = nn.MaxPool2d(2, 2)
         else:
             print('ERROR: patch size %i not currently supported'%patch_size)
-            exit()
+            sys.exit()
         self.image_convs_2 = nn.Sequential(
             nn.Conv2d(32, 32, kernel_size=3, padding=1, stride=2),
             nn.BatchNorm2d(32),
@@ -441,9 +443,9 @@ class LiFT(nn.Module):
 
 
 class ViTLiFTExtractor(nn.Module):
-    def __init__(self, model_type: str = 'dino_vits8', lift_path: str = None, channel: int = 768, patch: int = 8, stride: int = 8,
+    def __init__(self, model_type: str = 'dino_vits8', lift_path: str | None = None, channel: int = 768, patch: int = 8, stride: int = 8,
             layer: int = 11, facet: str = 'key', model: nn.Module = None, device: str = 'cuda', silent=False):
-        super(ViTLiFTExtractor, self).__init__()
+        super().__init__()
         self.model_type = model_type
         self.model = model
         self.lift_path = lift_path

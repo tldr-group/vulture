@@ -1,15 +1,12 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
-from torch import nn
 import torch.nn.functional as F
 import torchvision.transforms as T
-import numpy as np
-
 from PIL import Image
+from torch import nn
 
 from vulture.utils import do_2D_pca
-
-
-import matplotlib.pyplot as plt
 
 
 class Model(nn.Module):
@@ -112,13 +109,13 @@ def vis(
 
 if __name__ == "__main__":
     from vulture.comparisons.loftup.featurizers.util import get_featurizer
-    from vulture.models.external.online_denoiser import Denoiser
     from vulture.models.external.autoencoder import get_autoencoder
+    from vulture.models.external.online_denoiser import Denoiser
 
     PATH = "data/imagenet_reduced"
     DATA_FOLDER = "data_lu_reg"
 
-    for i in range(0, 30):
+    for i in range(30):
         fname = f"00{240 + i}"
 
         DEVICE = "cuda:1"

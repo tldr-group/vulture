@@ -1,9 +1,9 @@
 "From github user @milesil (https://github.com/milesial/Pytorch-UNet)"
 
-import torch
-import torch.nn as nn
-
 from math import floor
+
+import torch
+from torch import nn
 
 
 class DoubleConv(nn.Module):

@@ -1,14 +1,13 @@
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-import torch.nn.functional as F
+import random
+from collections.abc import Callable
+from random import choice
 
 import numpy as np
-import random
+import torch
+import torch.nn.functional as F
 from sklearn.decomposition import PCA
-
-from random import choice
-from typing import Callable
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
 
 from vulture.models import PretrainedViTWrapper
 
@@ -294,14 +293,14 @@ def get_lr_featup_feats_and_pca(
     return lr_feats, pca
 
 
-class TorchPCA(object):
+class TorchPCA:
     def __init__(self, n_components):
         self.n_components = n_components
 
     def fit(self, X):
         self.mean_ = X.mean(dim=0)
         unbiased = X - self.mean_.unsqueeze(0)
-        U, S, V = torch.pca_lowrank(unbiased, q=self.n_components, center=False, niter=4)
+        _U, S, V = torch.pca_lowrank(unbiased, q=self.n_components, center=False, niter=4)
         self.components_ = V.T
         self.singular_values_ = S
         return self
@@ -351,7 +350,7 @@ def pca(image_feats_list, dim=3, fit_pca=None, use_torch_pca=True, max_samples=N
             x_red = torch.from_numpy(x_red)
         x_red -= x_red.min(dim=0, keepdim=True).values
         x_red /= x_red.max(dim=0, keepdim=True).values
-        B, C, H, W = feats.shape
+        B, _C, H, W = feats.shape
         reduced_feats.append(x_red.reshape(B, H, W, dim).permute(0, 3, 1, 2))  # .to(device)
 
     return reduced_feats, fit_pca
