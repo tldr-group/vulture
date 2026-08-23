@@ -212,7 +212,7 @@ class AlibiAttention(Attention):
         else:
             self.register_parameter("m", m)
 
-    def forward(self, x: torch.Tensor, attn_bias=None, attn_mask=None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, attn_bias=None, attn_mask=None, is_causal=False) -> torch.Tensor:
         B, N, C = x.shape
 
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
@@ -261,6 +261,10 @@ class AlibiBlock(Block):
         act_layer: Type[nn.Module] = nn.GELU,
         norm_layer: Type[nn.Module] = nn.LayerNorm,
         mlp_layer: Type[nn.Module] = Mlp,
+        attn_layer: Attention | None = None,
+        depth: int = 0,
+        device=None,
+        dtype=None,
     ) -> None:
         super().__init__(
             dim=dim,
