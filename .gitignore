@@ -186,5 +186,6 @@ paper_figures/models/
 
 old
 examples/denoising_data/*
+examples/denoising/*
 denoising_batch.ipynb
 scripts/*
