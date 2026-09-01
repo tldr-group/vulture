@@ -1,11 +1,12 @@
 from random import shuffle, seed
-from os import listdir
+from os import listdir, makedirs
 from shutil import move
 
 seed(1025)
 N_VAL = 500
-input_dir = "data/imagenet_reduced/data_jf_reg"
-target_dir = "data/imagenet_reduced/val_jf_reg"
+input_dir = "data/imagenet_reduced/data_au"
+target_dir = "data/imagenet_reduced/val_au"
+makedirs(target_dir, exist_ok=True)
 if __name__ == "__main__":
     all_data = listdir(input_dir)
     # sample without replacement

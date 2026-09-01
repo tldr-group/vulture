@@ -29,6 +29,7 @@ dependencies = [
   "tifffile>=2025.3.30",
   "matplotlib>=3.10.0",
   "ninja>=1.11.1.1",
+  "datasets"
   ]
 
 [project.optional-dependencies]
@@ -51,15 +52,15 @@ featup = ["torch"]
 "Bug Tracker" = "https://github.com/tldr-group/vulture/issues"
 
 [tool.setuptools]
-packages = ["vulture", "vulture.models", "vulture.models.external", "vulture.comparisons"]
+packages = ["vulture", "vulture.datasets", "vulture.models", "vulture.models.external", "vulture.comparisons"]
 
-#[tool.uv.sources]
-#torch = [
-#  { index = "pytorch-cu128" },
-#]
-#torchvision = [
-#  { index = "pytorch-cu128" },
-#]
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128" },
+]
+torchvision = [
+  { index = "pytorch-cu128" },
+]
 # featup = [{ index = "pypi", ignore-deps = true },]
 
 [[tool.uv.index]]

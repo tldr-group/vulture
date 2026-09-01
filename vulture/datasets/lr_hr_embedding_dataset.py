@@ -33,7 +33,7 @@ class EmbeddingDataset(Dataset):
         expr: Experiment,
         using_splits: bool = True,
         device: str = "cuda:1",
-        data_suffix: Literal["", "_reg", "_fit_reg", "_lu_reg", "_jf_reg"] = "",
+        data_suffix: Literal["", "_reg", "_fit_reg", "_lu_reg", "_jf_reg", "_au"] = "",
     ) -> None:
         super().__init__()
 

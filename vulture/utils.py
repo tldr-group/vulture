@@ -381,8 +381,8 @@ def vis(
         hr_feats_red = hr_feats_np.transpose((1, 2, 0))[:, :, 0:3]
         hr_feats_red = rescale(hr_feats_red)
     else:
-        lr_feats_red = do_2D_pca(lr_feats_np, 3, post_norm="minmax")
-        hr_feats_red = do_2D_pca(hr_feats_np, 3, post_norm="minmax")
+        lr_feats_red = do_2D_pca(lr_feats_np, 9, pre_norm="std", post_norm="minmax")[:, :, 0:3]
+        hr_feats_red = do_2D_pca(hr_feats_np, 9, pre_norm="std", post_norm="minmax")[:, :, 0:3]
 
     n_cols = 4 if remapped is not None else 3
 
@@ -392,7 +392,7 @@ def vis(
     axs[2].imshow(hr_feats_red)
     if remapped is not None:
         res_2D_np = remapped.detach().cpu()[0].numpy()
-        res_feats_red = do_2D_pca(res_2D_np, 3, post_norm="minmax")
+        res_feats_red = do_2D_pca(res_2D_np, 3, pre_norm="std", post_norm="minmax")
         axs[3].imshow(res_feats_red)
 
     for ax in axs:

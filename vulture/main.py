@@ -273,6 +273,12 @@ class CompleteUpsampler(nn.Module):
                 dv2_feats = optionally_apply_modify_fn(dv2_feats)
                 dv2_feats = F.normalize(dv2_feats, p=1, dim=1)
                 lr_feats = self.autoencoder.encoder(dv2_feats)
+            case "ANYUP_COMPRESSED":
+                assert self.autoencoder is not None
+                dv2_feats = self.dv2_model.forward_features(lr_feat_input_img, make_2D=True)
+                dv2_feats = optionally_apply_modify_fn(dv2_feats)
+                dv2_feats = F.normalize(dv2_feats, p=1, dim=1)
+                lr_feats = self.autoencoder.encoder(dv2_feats)
             case _:
                 raise Exception(f"Unsupported feature type {_}")
 
