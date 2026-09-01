@@ -29,15 +29,16 @@ dependencies = [
   "tifffile>=2025.3.30",
   "matplotlib>=3.10.0",
   "ninja>=1.11.1.1",
-  "datasets"
-  ]
+  "datasets",
+  "einops>=0.8.2",
+]
 
 [project.optional-dependencies]
 paper = [
   "omegaconf>=2.3.0",
   "segmentation_models_pytorch",
   "albumentations",
-  # "featup@git+https://github.com/mhamilton723/FeatUp",
+  "featup@git+https://github.com/mhamilton723/FeatUp",
   #"pretrained_microscopy_models@git+https://github.com/nasa/pretrained-microscopy-models",
   "PyWavelets",
   "ipykernel",
@@ -53,6 +54,11 @@ featup = ["torch"]
 
 [tool.setuptools]
 packages = ["vulture", "vulture.datasets", "vulture.models", "vulture.models.external", "vulture.comparisons"]
+
+[tool.uv]
+exclude-dependencies = [
+    { package = { name = "featup" }, dependencies = ["timm"] },
+]
 
 [tool.uv.sources]
 torch = [
