@@ -47,13 +47,20 @@ paper = [
 
 [tool.uv.extra-build-dependencies]
 featup = ["torch"]
+flash-attn = ["torch"]
+
+[tool.uv]
+exclude-dependencies = [
+    { package = { name = "featup" }, dependencies = ["timm"] },
+]
+no-build-isolation = true
 
 [project.urls]
 "Homepage" = "https://github.com/tldr-group/vulture"
 "Bug Tracker" = "https://github.com/tldr-group/vulture/issues"
 
 [tool.setuptools]
-packages = ["vulture", "vulture.datasets", "vulture.models", "vulture.models.external", "vulture.comparisons"]
+packages = ["vulture", "vulture.datasets", "vulture.models", "vulture.models.external", "vulture.comparisons", "vulture.comparisons.layers"]
 
 [tool.uv]
 exclude-dependencies = [
@@ -67,7 +74,9 @@ torch = [
 torchvision = [
   { index = "pytorch-cu128" },
 ]
-# featup = [{ index = "pypi", ignore-deps = true },]
+# flash-attn = [
+#  { url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.2/flash_attn-2.8.2+cu12torch2.4cxx11abiFALSE-cp312-cp312-linux_x86_64.whl" }
+#]
 
 [[tool.uv.index]]
 name = "pypi"
