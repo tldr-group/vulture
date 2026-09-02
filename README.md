@@ -135,6 +135,13 @@ Windows:
 .\install\download_chkpoints.ps1
 ```
 
+## Data
+
+```bash
+curl -L -o data.zip https://zenodo.org/records/16993498/files/fig_data.zip?download=1
+unzip -q data.zip -d paper_figures/
+```
+
 ## Project structure
 
 ```bash

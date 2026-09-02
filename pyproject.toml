@@ -30,10 +30,7 @@ dependencies = [
   "matplotlib>=3.10.0",
   "ninja>=1.11.1.1",
   "datasets",
-  "einops",
-  "flash-attn",
-  "packaging>=26.3",
-  "psutil>=7.2.2",
+  "einops>=0.8.2",
 ]
 
 [project.optional-dependencies]
@@ -64,6 +61,11 @@ no-build-isolation = true
 
 [tool.setuptools]
 packages = ["vulture", "vulture.datasets", "vulture.models", "vulture.models.external", "vulture.comparisons", "vulture.comparisons.layers"]
+
+[tool.uv]
+exclude-dependencies = [
+    { package = { name = "featup" }, dependencies = ["timm"] },
+]
 
 [tool.uv.sources]
 torch = [

@@ -3724,7 +3724,6 @@ source = { editable = "." }
 dependencies = [
     { name = "datasets" },
     { name = "einops" },
-    { name = "flash-attn" },
     { name = "matplotlib" },
     { name = "ninja" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -3759,9 +3758,8 @@ paper = [
 requires-dist = [
     { name = "albumentations", marker = "extra == 'paper'" },
     { name = "datasets" },
-    { name = "einops" },
+    { name = "einops", specifier = ">=0.8.2" },
     { name = "featup", marker = "extra == 'paper'", git = "https://github.com/mhamilton723/FeatUp" },
-    { name = "flash-attn" },
     { name = "interactive-seg-backend", marker = "extra == 'paper'", git = "https://github.com/tldr-group/interactive-seg-backend" },
     { name = "ipykernel", marker = "extra == 'paper'" },
     { name = "matplotlib", specifier = ">=3.10.0" },

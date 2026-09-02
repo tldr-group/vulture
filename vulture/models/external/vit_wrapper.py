@@ -7,6 +7,7 @@ Adpated from https://github.com/Jiawei-Yang/Denoising-ViT/blob/main/dvt/models/v
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torchvision import transforms
 from timm import create_model
 
@@ -19,13 +20,13 @@ from types import MethodType
 from typing import Callable, Literal
 
 
-FLASH_ATTN_INSTALLED = False
-try:
-    from flash_attn import flash_attn_qkvpacked_func
+FLASH_ATTN_INSTALLED = True
+# try:
+#     from flash_attn import flash_attn_qkvpacked_func
 
-    FLASH_ATTN_INSTALLED = True
-except ImportError:
-    pass
+#     FLASH_ATTN_INSTALLED = True
+# except ImportError:
+#     pass
 
 
 FeatureType = Literal["FEATUP", "LOFTUP_FULL", "LOFTUP_COMPRESSED", "ALIBI_COMPRESSED", "ANYUP_COMPRESSED"]
@@ -59,12 +60,26 @@ class Patch:
         """
 
         # we add both attn_bias and attn_mask to align with old & new timm interfaces
-        def forward(self: Attention, x: torch.Tensor, attn_bias=None, attn_mask=None) -> torch.Tensor:
+        def forward(
+            self: Attention, x: torch.Tensor, attn_bias=None, attn_mask=None, is_causal: bool = False
+        ) -> torch.Tensor:
             # TODO: attn_bias -> attn_mask in new timm, find way to align these
             B, N, C = x.shape
-            qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
-            x = flash_attn_qkvpacked_func(qkv)  # type: ignore
-            x = x.reshape([B, N, C])
+            qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            q, k, v = qkv.unbind(0)
+            # q, k = self.q_norm(q), self.k_norm(k)
+
+            x = F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                attn_mask=attn_mask,
+                dropout_p=self.attn_drop.p if self.training else 0.0,
+                is_causal=is_causal,
+            )
+
+            x = x.transpose(1, 2).reshape(B, N, C)
+            # x = self.norm(x)
 
             x = self.proj(x)
             x = self.proj_drop(x)
