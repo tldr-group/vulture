@@ -181,6 +181,7 @@ batch_vis.png
 tmp/*
 
 paper_figures/fig_data
+paper_figures/fig_pdf
 paper_figures/fig_outds
 paper_figures/models/
 
