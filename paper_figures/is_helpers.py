@@ -1,3 +1,4 @@
+from vulture import CompleteUpsampler
 from cProfile import label
 import torch
 import numpy as np
@@ -10,7 +11,7 @@ from vulture.main import (
     closest_crop,
     Experiment,
 )
-from vulture.models import FeatureUpsampler
+from vulture.models import FeatureUpsampler, PretrainedViTWrapper
 from vulture.utils import to_numpy
 from vulture.feature_prep import PCAUnprojector
 
@@ -42,21 +43,38 @@ AllowedDatasets = Literal["Cu_ore_RLM", "Ni_superalloy_SEM", "T_cell_TEM"]
 
 def get_deep_feats(
     img: Image.Image,
-    dv2: torch.nn.Module,
-    upsampler: FeatureUpsampler,
-    expr: Experiment,
+    upsampler: CompleteUpsampler,
     K: int = K_TRUNCATE,
     existing_pca: PCAUnprojector | None = None,
 ) -> np.ndarray:
-    hr_feats = get_hr_feats(img, dv2, upsampler, DEVICE, n_ch_in=expr.n_ch_in, existing_pca=existing_pca)
+    hr_feats = upsampler.forward(img, existing_pca)
     hr_feats_np = to_numpy(hr_feats)
     hr_feats_np = hr_feats_np.transpose((1, 2, 0))[:, :, :K]
+
+    # print("Adding ramp feature")
+    # h, w, _ = hr_feats_np.shape
+    # yy, xx = np.meshgrid(np.arange(h), np.arange(w), indexing="ij")
+    # cy, cx = h // 2, w // 2
+    # r = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
+    # r_norm = r / r.max()
+    # ramp = 1 - r_norm
+    # ramp = np.expand_dims(ramp, axis=-1)
+    # hr_feats_np = np.concatenate((hr_feats_np, ramp), axis=-1)
+
+    # print("using uspampled dv2")
+    # img_tensor, _ = upsampler.transform_image(img)
+    # w, h = img.size
+    # lr_feats = upsampler.dv2_model.forward_features(img_tensor, make_2D=True)
+    # hr_feats = torch.nn.functional.interpolate(lr_feats, size=(h, w), mode="bilinear", align_corners=False)
+    # hr_feats_np = to_numpy(hr_feats)
+    # hr_feats_np = hr_feats_np.transpose((1, 2, 0))[:, :, :K]
+
     return hr_feats_np
 
 
 def get_pca_over_images_or_dir(
     existing_imgs: list[Image.Image] | list[str] | str,
-    dv2: torch.nn.Module,
+    dv2: PretrainedViTWrapper,
 ) -> PCAUnprojector:
     imgs: list[Image.Image] = []
     if type(existing_imgs) is str:
@@ -84,7 +102,7 @@ def get_pca_over_images_or_dir(
         tensor = convert_image(img, tr, device_str=DEVICE)
         img_tensors.append(tensor)
 
-    _, pca = get_lr_feats(dv2, img_tensors, n_imgs=100, n_batch=100, fit3d=True)
+    _, pca = get_lr_feats(dv2, img_tensors, n_imgs=100, n_batch=100, n_feats_in=128)
     return pca
 
 
@@ -93,9 +111,7 @@ def get_and_cache_features_over_images(
     train_cfg: TrainingConfig,
     cache_path: str,
     path: str,
-    dv2: torch.nn.Module,
-    upsampler: FeatureUpsampler,
-    expr: Experiment,
+    upsampler: CompleteUpsampler,
     existing_pca: PCAUnprojector | None = None,
     K: int = K_TRUNCATE,
 ):
@@ -111,7 +127,7 @@ def get_and_cache_features_over_images(
         feats = featurise_(img_arr, train_cfg.feature_config)
         if train_cfg.add_dino_features:
             img = Image.fromarray(img_arr).convert("RGB")
-            deep_feats = get_deep_feats(img, dv2, upsampler, expr, K, existing_pca)
+            deep_feats = get_deep_feats(img, upsampler, K, existing_pca)
             feats = np.concatenate((feats, deep_feats), axis=-1)
         save_featurestack(feats, f"{path}/{cache_path}/{fname.split('.')[0]}", ".npy")
 
@@ -126,22 +142,26 @@ def train_model_over_images(
     train_cfg: TrainingConfig,
     path: str,
     train_fnames: list[str],
-    dv2: torch.nn.Module,
-    upsampler: FeatureUpsampler,
-    expr: Experiment,
+    dv2: PretrainedViTWrapper,
+    upsampler: CompleteUpsampler,
     feature_cache_paths: list[str] | None = None,
     K: int = K_TRUNCATE,
     merge_small_class: bool = False,
     baseline_addition: BaselineAdditions = None,
     overwrite_with_gt: bool = False,
     reveal_all: bool = False,
+    pca_fnames: list[str] | None = None,
+    do_pca: bool = True,
 ) -> tuple[Classifier, object]:
     features: list[np.ndarray] | list[str] = []
     labels = []
 
     pca = None
-    if train_cfg.add_dino_features:
-        img_paths = [f"{path}/{dataset}/images/{fname}.tif" for fname in train_fnames]
+    if train_cfg.add_dino_features and do_pca:
+        if pca_fnames is not None:
+            img_paths = [f"{path}/{dataset}/images/{fname}" for fname in pca_fnames]
+        else:
+            img_paths = [f"{path}/{dataset}/images/{fname}.tif" for fname in train_fnames]
         pca = get_pca_over_images_or_dir(img_paths, dv2)
 
     for fname in train_fnames:
@@ -171,7 +191,8 @@ def train_model_over_images(
         feats = featurise_(img_arr, train_cfg.feature_config)
         if train_cfg.add_dino_features:
             img = Image.fromarray(img_arr).convert("RGB")
-            deep_feats = get_deep_feats(img, dv2, upsampler, expr, K, pca)
+            # deep_feats = get_deep_feats(img, dv2, upsampler, expr, K, pca)
+            deep_feats = get_deep_feats(img, upsampler, K, pca)
             feats = np.concatenate((feats, deep_feats), axis=-1)
         if baseline_addition == "random":
             h, w, _ = feats.shape
@@ -203,9 +224,7 @@ def apply_model_over_images(
     train_cfg: TrainingConfig,
     model: Classifier,
     path: str,
-    dv2: torch.nn.Module,
-    upsampler: FeatureUpsampler,
-    expr: Experiment,
+    upsampler: CompleteUpsampler,
     verbose: bool = False,
     early_cutoff_n: int = -1,
     existing_pca: PCAUnprojector | None = None,
@@ -231,7 +250,7 @@ def apply_model_over_images(
             feats = featurise_(img_arr, train_cfg.feature_config)
             if train_cfg.add_dino_features:
                 img = Image.fromarray(img_arr).convert("RGB")
-                deep_feats = get_deep_feats(img, dv2, upsampler, expr, K, existing_pca)
+                deep_feats = get_deep_feats(img, upsampler, K, existing_pca)
                 feats = np.concatenate((feats, deep_feats), axis=-1)
             if baseline_addition == "random":
                 h, w, _ = feats.shape
