@@ -428,7 +428,6 @@ def get_hr_feats(
         dv2,
         [cropped_tensor.half()],
         n_imgs_for_red,
-        fit3d=fit_3d,
         n_feats_in=n_ch_in,
         n_batch=n_batch_lr,
         existing_pca=existing_pca,

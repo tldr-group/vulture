@@ -212,7 +212,7 @@ class AlibiAttention(Attention):
         else:
             self.register_parameter("m", m)
 
-    def forward(self, x: torch.Tensor, attn_bias=None, attn_mask=None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, attn_bias=None, attn_mask=None, is_causal=False) -> torch.Tensor:
         B, N, C = x.shape
 
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
@@ -222,19 +222,19 @@ class AlibiAttention(Attention):
         bias = self.m * self.distance_matrix.matrix
         bias = bias.unsqueeze(0)
 
-        if self.fused_attn:
-            x = F.scaled_dot_product_attention(
-                q, k, v, dropout_p=self.attn_drop.p if self.training else 0.0, attn_mask=bias
-            )
-        else:
-            q = q * self.scale
-            attn = q @ k.transpose(-2, -1)
+        # if self.fused_attn:
+        x = F.scaled_dot_product_attention(
+            q, k, v, dropout_p=self.attn_drop.p if self.training else 0.0, attn_mask=bias
+        )
+        # else:
+        #     q = q * self.scale
+        #     attn = q @ k.transpose(-2, -1)
 
-            attn = attn + bias
+        #     attn = attn + bias
 
-            attn = attn.softmax(dim=-1)
-            attn = self.attn_drop(attn)
-            x = attn @ v
+        #     attn = attn.softmax(dim=-1)
+        #     attn = self.attn_drop(attn)
+        #     x = attn @ v
 
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
@@ -261,6 +261,10 @@ class AlibiBlock(Block):
         act_layer: Type[nn.Module] = nn.GELU,
         norm_layer: Type[nn.Module] = nn.LayerNorm,
         mlp_layer: Type[nn.Module] = Mlp,
+        attn_layer: Type[nn.Module] | None = None,
+        depth: int = 0,
+        device: str = "cpu",
+        dtype: torch.dtype = torch.float32,
     ) -> None:
         super().__init__(
             dim=dim,
